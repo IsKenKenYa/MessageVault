@@ -1,0 +1,12 @@
+- [ ] git-filter-repo 工具已安装可用
+- [ ] 三个源仓库已成功克隆到临时目录
+- [ ] Monorepo 根目录包含 LICENSE（来自 .github 仓库）
+- [ ] Monorepo 根目录包含 NOTICE.md（来自 .github 仓库）
+- [ ] 根 README.md 包含组织介绍（来自 profile/README.md）、项目概览和许可证说明
+- [ ] mobile/ 子目录包含 MessageVault-Mobile 的完整文件
+- [ ] mobile/ 子目录包含 GPL v3.0 LICENSE 文件
+- [ ] previewer/ 子目录包含 SMS-Previewer 的完整文件
+- [ ] previewer/ 子目录包含 CC BY-NC-SA 4.0 LICENSE 文件
+- [ ] Git 历史中包含来自 MessageVault-Mobile 的提交记录
+- [ ] Git 历史中包含来自 SMS-Previewer 的提交记录
+- [ ] 代码已成功推送到 git@github.com:IsKenKenYa/MessageVault.git
