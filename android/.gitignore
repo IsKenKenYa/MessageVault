@@ -1,0 +1,69 @@
+# 编译输出
+/build/
+/*/build/
+/bin/
+/target/
+/out/
+*.class
+*.jar
+*.war
+*.ear
+
+# Android 特定文件
+*.apk
+*.aab
+*.aar
+*.dex
+/captures/
+.externalNativeBuild/
+.cxx/
+*.ap_
+*.jks
+*.keystore
+google-services.json
+firebase_credentials.json
+
+# 临时文件和日志
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+.gradle/
+local.properties
+
+# IDE文件
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+.gradle
+.navigation/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 大型媒体和二进制文件
+*.mp4
+*.mp3
+*.zip
+*.tar.gz
+*.rar
+
+# Java heap dump files
+*.hprof
+java_pid*.hprof
+
+# BuildConfig文件和资源文件
+/app/build/generated/
+/app/build/intermediates/
+/app/build/kotlin/
+/app/build/outputs/
+/app/build/tmp/
+/build_debug_log.txt
+/build_log.txt
+/.cursor/rules/messagevault-project-notice.mdc
+/detailed_log.txt
