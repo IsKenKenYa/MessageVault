@@ -1,17 +1,17 @@
-- [ ] git-filter-repo 工具已安装可用
-- [ ] 三个源仓库已成功克隆到临时目录
-- [ ] /workspace 已初始化为 Git 仓库
-- [ ] 根目录包含 GPL v3.0 LICENSE 文件
-- [ ] 根目录包含 NOTICE.md 文件
-- [ ] 根 README.md 包含组织介绍（来自 profile/README.md）、项目概览、许可证说明和功能规划
-- [ ] android/ 子目录包含 MessageVault-Mobile 的完整文件
-- [ ] android/ 子目录使用 GPL v3.0 许可证
-- [ ] previewer/ 子目录包含 SMS-Previewer 的完整文件
-- [ ] previewer/ 子目录使用 GPL v3.0 许可证（已替换 CC BY-NC-SA 4.0）
-- [ ] Git 历史中包含来自 MessageVault-Mobile 的提交记录
-- [ ] Git 历史中包含来自 SMS-Previewer 的提交记录
-- [ ] previewer/ 项目 pnpm install && pnpm build 成功
-- [ ] android/ 项目构建环境配置正确
-- [ ] 根 README.md 包含各子项目的功能规划说明
-- [ ] 代码已推送到 git@github.com:IsKenKenYa/MessageVault.git
-- [ ] 原始组织仓库未被修改，保留原状
+- [x] git-filter-repo 工具已安装可用
+- [x] 三个源仓库已成功克隆到临时目录
+- [x] /workspace 已初始化为 Git 仓库
+- [x] 根目录包含 GPL v3.0 LICENSE 文件
+- [x] 根目录包含 NOTICE.md 文件
+- [x] 根 README.md 包含组织介绍（来自 profile/README.md）、项目概览、许可证说明和功能规划
+- [x] android/ 子目录包含 MessageVault-Mobile 的完整文件
+- [x] android/ 子目录使用 GPL v3.0 许可证
+- [x] previewer/ 子目录包含 SMS-Previewer 的完整文件
+- [x] previewer/ 子目录使用 GPL v3.0 许可证（已替换 CC BY-NC-SA 4.0）
+- [x] Git 历史中包含来自 MessageVault-Mobile 的提交记录
+- [x] Git 历史中包含来自 SMS-Previewer 的提交记录
+- [x] previewer/ 项目 pnpm install && pnpm build 成功
+- [x] android/ 项目构建环境配置正确
+- [x] 根 README.md 包含各子项目的功能规划说明
+- [ ] 代码已推送到 git@github.com:IsKenKenYa/MessageVault.git（由用户手动执行）
+- [x] 原始组织仓库未被修改，保留原状
