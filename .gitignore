@@ -26,6 +26,7 @@ previewer/node_modules/
 previewer/dist/
 previewer/.temp/
 previewer/.cache/
+.pnpm-store/
 
 # Coverage
 coverage/
