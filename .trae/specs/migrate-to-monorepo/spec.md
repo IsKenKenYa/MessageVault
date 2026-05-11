@@ -81,9 +81,11 @@ MessageVault 组织下的 3 个仓库（.github、MessageVault-Mobile、SMS-Prev
 ### Requirement: 推送到远程仓库
 系统 SHALL 将 Monorepo 推送到 git@github.com:IsKenKenYa/MessageVault.git。
 
+> **注意**：在虚拟环境中不执行 git push 或分支切换操作，推送由用户手动完成。
+
 #### Scenario: 推送成功
 - **WHEN** Monorepo 迁移和验证完成
-- **THEN** 代码已推送到 git@github.com:IsKenKenYa/MessageVault.git
+- **THEN** 代码已推送到 git@github.com:IsKenKenYa/MessageVault.git（由用户手动执行）
 
 ### Requirement: 原始仓库保留
 系统 SHALL 不修改原始组织仓库（MessageVault/.github、MessageVault/MessageVault-Mobile、MessageVault/SMS-Previewer），仅以只读方式克隆并迁移内容。
