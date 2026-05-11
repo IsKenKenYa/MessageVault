@@ -4,13 +4,14 @@
 - [ ] 根目录包含 GPL v3.0 LICENSE 文件
 - [ ] 根目录包含 NOTICE.md 文件
 - [ ] 根 README.md 包含组织介绍（来自 profile/README.md）、项目概览、许可证说明和功能规划
-- [ ] mobile/ 子目录包含 MessageVault-Mobile 的完整文件
-- [ ] mobile/ 子目录使用 GPL v3.0 许可证
+- [ ] android/ 子目录包含 MessageVault-Mobile 的完整文件
+- [ ] android/ 子目录使用 GPL v3.0 许可证
 - [ ] previewer/ 子目录包含 SMS-Previewer 的完整文件
 - [ ] previewer/ 子目录使用 GPL v3.0 许可证（已替换 CC BY-NC-SA 4.0）
 - [ ] Git 历史中包含来自 MessageVault-Mobile 的提交记录
 - [ ] Git 历史中包含来自 SMS-Previewer 的提交记录
 - [ ] previewer/ 项目 pnpm install && pnpm build 成功
-- [ ] mobile/ 项目构建环境配置正确
+- [ ] android/ 项目构建环境配置正确
 - [ ] 根 README.md 包含各子项目的功能规划说明
 - [ ] 代码已推送到 git@github.com:IsKenKenYa/MessageVault.git
+- [ ] 原始组织仓库未被修改，保留原状
