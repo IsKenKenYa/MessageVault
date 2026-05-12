@@ -1,7 +1,7 @@
 package imken.messagevault.mobile.api
 
 import imken.messagevault.mobile.config.Config
-import imken.messagevault.mobile.data.BackupFile
+import imken.messagevault.mobile.models.BackupFile
 import timber.log.Timber
 
 /**

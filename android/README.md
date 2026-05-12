@@ -52,12 +52,86 @@ MessageVault Mobile是一个专注于Android数据备份与恢复的开源应用
 ## 🛠️ 技术栈
 
 - **UI框架**: Jetpack Compose
-- **架构模式**: MVVM
+- **架构模式**: MVVM + 多模块SDK架构
 - **状态管理**: ViewModel + StateFlow
-- **依赖注入**: Hilt (计划中)
+- **依赖注入**: 构造函数注入（SDK接口由App模块实现注入）
 - **数据持久化**: Room + DataStore
 - **并发处理**: Kotlin Coroutines
-- **单元测试**: JUnit + Mockito
+- **序列化**: Gson（封装在BackupSerializer中）
+- **网络请求**: Retrofit
+- **单元测试**: JUnit + Mockito + Kotlin Coroutines Test
+
+## 🏗️ 项目架构
+
+### 模块结构
+
+```
+MessageVault-Mobile/
+├── sdk/
+│   ├── backup/                # 纯Kotlin备份/恢复SDK
+│   │   └── src/main/kotlin/imken/messagevault/sdk/backup/
+│   │       ├── BackupManager.kt       # 备份门面类
+│   │       ├── RestoreManager.kt      # 恢复管理器
+│   │       ├── model/                 # 数据模型（BackupData, Message, CallLog, Contact...）
+│   │       ├── serializer/            # JSON序列化（BackupSerializer）
+│   │       ├── reader/                # 读取接口（SmsReader, CallLogReader, ContactReader, BackupFileReader）
+│   │       └── writer/                # 写入接口（SmsWriter, CallLogWriter, ContactWriter, BackupFileWriter）
+│   ├── auth/                  # 纯Kotlin认证组件
+│   │   └── src/main/kotlin/imken/messagevault/sdk/auth/
+│   │       ├── AuthProvider.kt        # 认证接口 + 数据模型（UserInfo, AuthResult, AuthCredentials）
+│   │       ├── LocalAuthProvider.kt   # 本地模式实现
+│   │       ├── ThirdPartyAuthProvider.kt # 第三方登录接口
+│   │       └── AuthManager.kt         # 认证管理器（委托模式）
+│   └── storage/               # Android Library存储组件
+│       └── src/main/kotlin/imken/messagevault/sdk/storage/
+│           ├── StorageProvider.kt     # 存储接口 + 数据模型（StorageResult, StorageInfo）
+│           ├── LocalStorageProvider.kt  # 本地文件存储实现
+│           └── RemoteStorageProvider.kt # 远程存储接口
+├── app/                       # Android应用壳
+│   └── src/main/java/imken/messagevault/mobile/
+│       ├── data/backup/       # Android平台SDK实现（AndroidSmsReader, AndroidCallLogWriter...）
+│       ├── model/             # 应用层数据模型
+│       ├── models/            # UI数据模型
+│       ├── ui/                # Compose UI + ViewModel + 导航
+│       ├── utils/             # 工具类
+│       └── MainActivity.kt    # 主Activity
+└── docs/architecture/         # 架构设计文档
+    ├── harmonyos-adaptation.md
+    ├── third-party-auth.md
+    ├── ai-agent-integration.md
+    └── backend-microservices.md
+```
+
+### 模块依赖关系
+
+```
+┌─────────────────────────────────────┐
+│              app                     │
+│  (UI · ViewModel · 权限 · 导航)      │
+│  (Android平台SDK接口实现)             │
+└──────┬──────────┬──────────┬────────┘
+       │          │          │
+       ▼          ▼          ▼
+┌────────────┐ ┌────────────┐ ┌────────────┐
+│ sdk/backup │ │  sdk/auth  │ │ sdk/storage │
+│ (纯Kotlin) │ │ (纯Kotlin) │ │ (Android   │
+│            │ │            │ │  Library)  │
+└────────────┘ └────────────┘ └────────────┘
+  备份/恢复      认证/登录      存储/数据库
+  数据模型       身份管理       文件/远程存储
+  序列化         Token管理      Room数据库
+```
+
+> SDK模块之间互不依赖，纯Kotlin模块（backup、auth）可跨平台复用
+
+### 架构设计文档
+
+| 文档 | 说明 |
+|------|------|
+| [鸿蒙适配设计文档](docs/architecture/harmonyos-adaptation.md) | 鸿蒙原生开发方案、KMP复用策略、权限差异分析 |
+| [第三方登录设计文档](docs/architecture/third-party-auth.md) | AuthProvider接口设计、OAuth2.0扩展、Token安全 |
+| [AI Agent集成设计文档](docs/architecture/ai-agent-integration.md) | 知识库架构、本地/云端AI模型、隐私保护 |
+| [后端微服务架构设计文档](docs/architecture/backend-microservices.md) | 服务拆分、API网关、NAS自部署方案 |
 
 ## 📦 安装要求
 
@@ -80,8 +154,21 @@ git clone https://github.com/MessageVault/MessageVault-Mobile.git
 # 进入项目目录
 cd MessageVault-Mobile
 
-# 构建项目
+# 构建整个项目（包含所有SDK模块和App）
 ./gradlew build
+
+# 仅构建特定模块
+./gradlew :sdk:backup:build     # 备份SDK
+./gradlew :sdk:auth:build       # 认证组件
+./gradlew :sdk:storage:build    # 存储组件
+./gradlew :app:assembleDebug    # Debug APK
+
+# 运行SDK模块测试（无需Android设备/模拟器）
+./gradlew :sdk:backup:test      # 备份SDK单元测试
+./gradlew :sdk:auth:test        # 认证组件单元测试
+
+# 运行所有测试
+./gradlew test
 ```
 
 ### 系统要求
@@ -90,6 +177,15 @@ cd MessageVault-Mobile
 - Android Studio Iguana或更高版本
 - Android SDK (API 24-34)
 - Gradle 8.2+
+
+### 模块说明
+
+| 模块 | 构建类型 | 说明 | 测试方式 |
+|------|---------|------|---------|
+| `sdk/backup` | java-library | 纯Kotlin，无Android依赖 | `./gradlew :sdk:backup:test` |
+| `sdk/auth` | java-library | 纯Kotlin，无Android依赖 | `./gradlew :sdk:auth:test` |
+| `sdk/storage` | Android Library | 依赖Room、Retrofit等 | `./gradlew :sdk/storage:connectedAndroidTest` |
+| `app` | Android Application | 依赖所有SDK模块 | `./gradlew :app:test` |
 
 ## 🤝 贡献指南
 

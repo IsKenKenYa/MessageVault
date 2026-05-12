@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "MessageVault-Mobile"
 include ':app'
+include ':sdk:backup'
+include ':sdk:auth'
+include ':sdk:storage'
