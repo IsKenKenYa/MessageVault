@@ -25,15 +25,32 @@ MessageVault是一个开源项目，为Android用户提供安全、私密的短�
 
 ### 📱 android/ — MessageVault-Mobile `v0.1.4` ⭐ **主力项目**
 
-现代化Android应用，采用Material Design 3设计
+现代化Android应用，采用Material Design 3设计，多模块SDK架构
 - ✅ **短信备份**: 完整支持SMS备份，包含所有元数据
 - ✅ **通话记录备份**: 完整支持通话历史记录备份
 - ✅ **联系人备份**: 完整支持联系人信息备份
 - ✅ **智能恢复**: 支持选择性恢复，带进度显示
 - ✅ **Material You**: 支持动态取色和深色主题
 - ✅ **多语言**: 中文/英文界面支持
+- ✅ **模块化SDK**: 核心逻辑提取为独立SDK模块，支持跨平台复用
 
 **技术栈**: Kotlin · Jetpack Compose · Material Design 3 · MVVM · Room · Kotlin Coroutines
+
+#### SDK模块
+
+| 模块 | 类型 | 职责 |
+|------|------|------|
+| `sdk/backup` | 纯Kotlin | 备份/恢复核心逻辑（BackupManager、RestoreManager、BackupSerializer、数据模型、读写接口） |
+| `sdk/auth` | 纯Kotlin | 认证与身份管理（AuthProvider接口、LocalAuthProvider、ThirdPartyAuthProvider、AuthManager） |
+| `sdk/storage` | Android Library | 存储抽象与实现（StorageProvider接口、LocalStorageProvider、RemoteStorageProvider、Room） |
+| `app` | Android Application | 应用壳（UI、导航、权限、Android平台SDK接口实现） |
+
+#### 架构设计文档
+
+- [鸿蒙适配设计文档](android/docs/architecture/harmonyos-adaptation.md) — 鸿蒙原生开发方案、KMP复用策略
+- [第三方登录设计文档](android/docs/architecture/third-party-auth.md) — AuthProvider接口设计、OAuth2.0扩展
+- [AI Agent集成设计文档](android/docs/architecture/ai-agent-integration.md) — 知识库架构、本地/云端AI模型
+- [后端微服务架构设计文档](android/docs/architecture/backend-microservices.md) — 服务拆分、NAS自部署
 
 ### 🔍 previewer/ — SMS-Previewer `v0.0.1` ⭐ **工具项目**
 
@@ -63,7 +80,8 @@ MessageVault是一个开源项目，为Android用户提供安全、私密的短�
 ### Mobile (Android)
 - **框架**: Jetpack Compose + Material Design 3
 - **语言**: Kotlin
-- **架构**: MVVM + Repository Pattern
+- **架构**: MVVM + 多模块SDK架构
+- **SDK模块**: sdk/backup (纯Kotlin) · sdk/auth (纯Kotlin) · sdk/storage (Android Library)
 - **并发**: Kotlin Coroutines + StateFlow
 - **测试**: JUnit + Mockito + Espresso
 
@@ -75,19 +93,26 @@ MessageVault是一个开源项目，为Android用户提供安全、私密的短�
 ## 🏗️ 系统架构
 
 ```
-┌─────────────────┐
-│  Android App    │
-│ (android/)      │
-│ MessageVault-   │
-│ Mobile          │
-└────────┬────────┘
-         │ JSON Export
-         ▼
-┌─────────────────┐
-│ SMS-Previewer   │
-│ (previewer/)    │
-│  Web Tool       │
-└─────────────────┘
+┌─────────────────────────────────────────────┐
+│              Android App (app/)              │
+│  UI · ViewModel · 权限 · 导航 · SDK接口实现   │
+└──────┬──────────────┬──────────────┬────────┘
+       │              │              │
+       ▼              ▼              ▼
+┌────────────┐ ┌────────────┐ ┌────────────┐
+│ sdk/backup │ │  sdk/auth  │ │ sdk/storage │
+│ (纯Kotlin) │ │ (纯Kotlin) │ │ (Android   │
+│            │ │            │ │  Library)  │
+└────────────┘ └────────────┘ └────────────┘
+       │              │              │
+       └──────┬───────┘              │
+              │ JSON Export           │
+              ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐
+│ SMS-Previewer   │     │ 后端微服务       │
+│ (previewer/)    │     │ (规划中)         │
+│  Web Tool       │     │                 │
+└─────────────────┘     └─────────────────┘
 ```
 
 ## 🚀 快速开始

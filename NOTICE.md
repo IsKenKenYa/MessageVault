@@ -13,9 +13,62 @@
 - 避免过长的行（建议 120 字符以内）
 
 ### 架构原则
-- Android: MVVM + Repository Pattern
+- Android: MVVM + 多模块SDK架构
 - Vue: Composition API + 单向数据流
 - 模块化设计，职责分离
+- SDK模块接口驱动，平台实现通过构造函数注入
+
+## 🧩 多模块开发规范
+
+### 模块依赖规则
+
+```
+app → sdk/backup, sdk/auth, sdk/storage
+sdk/backup ✗→ sdk/auth, sdk/storage, app
+sdk/auth   ✗→ sdk/backup, sdk/storage, app
+sdk/storage ✗→ sdk/backup, sdk/auth, app
+```
+
+- `app` 模块可以依赖所有 `sdk/*` 模块
+- `sdk/*` 模块之间**禁止互相依赖**
+- `sdk/*` 模块**禁止依赖** `app` 模块
+- 新增模块依赖关系需经架构评审
+
+### SDK模块编码标准
+
+#### 纯Kotlin模块（sdk/backup、sdk/auth）
+
+- **禁止引入Android依赖**：不得使用 `android.*`、`androidx.*` 等Android框架API
+- **构建类型**：使用 `java-library` + `org.jetbrains.kotlin.jvm` 插件
+- **依赖限制**：仅允许纯Kotlin/JVM依赖（kotlin-stdlib、kotlinx-coroutines-core、gson等）
+- **接口设计**：所有平台相关操作通过接口暴露（如 `SmsReader`、`AuthProvider`），由 `app` 模块提供Android实现
+- **可测试性**：所有逻辑可通过纯JVM单元测试验证，无需Android模拟器
+
+#### Android Library模块（sdk/storage）
+
+- **构建类型**：使用 `com.android.library` + `org.jetbrains.kotlin.android` 插件
+- **允许的Android依赖**：Room、Retrofit、androidx.core等AndroidX库
+- **接口设计**：对外暴露纯Kotlin接口（如 `StorageProvider`），内部使用Android API实现
+- **最小化Android耦合**：尽量将纯逻辑提取为独立函数，减少对Android框架的依赖
+
+#### App模块
+
+- **职责**：UI展示、导航、权限管理、Android平台SDK接口实现
+- **SDK接口实现**：所有SDK定义的接口（`SmsReader`、`SmsWriter`、`StorageProvider`等）在 `app` 模块中提供Android实现
+- **依赖注入**：通过构造函数注入SDK接口实现，不使用Service Locator或全局单例
+
+### 测试规范
+
+| 模块类型 | 测试方式 | 测试命令 | 说明 |
+|---------|---------|---------|------|
+| 纯Kotlin SDK | JVM单元测试 | `./gradlew :sdk:backup:test` | 无需Android设备/模拟器 |
+| 纯Kotlin SDK | JVM单元测试 | `./gradlew :sdk:auth:test` | 无需Android设备/模拟器 |
+| Android Library | Instrumented测试 | `./gradlew :sdk/storage:connectedAndroidTest` | 需要Android设备/模拟器 |
+| App | JVM + Instrumented | `./gradlew :app:test` | ViewModel用JVM测试，UI用Instrumented测试 |
+
+- SDK模块测试覆盖率目标：核心逻辑 > 80%
+- App模块测试覆盖率目标：ViewModel > 70%
+- 新增SDK接口必须附带接口契约测试
 
 ## 💬 注释要求
 
@@ -33,7 +86,10 @@
 
 - 核心功能必须有单元测试
 - 关键流程需要集成测试
-- 测试覆盖率目标：核心模块 > 70%
+- 测试覆盖率目标：SDK核心模块 > 80%，App ViewModel > 70%
+- 纯Kotlin SDK模块（sdk/backup、sdk/auth）使用JVM单元测试，无需Android模拟器
+- Android Library模块（sdk/storage）使用Instrumented测试
+- 新增SDK接口必须附带接口契约测试
 
 ## 📝 变更记录
 
@@ -51,10 +107,20 @@
 
 ```
 MessageVault/
-├── android/          # MessageVault-Mobile (Kotlin/Android)
-├── previewer/        # SMS-Previewer (Vue 3/Vite)
-├── .trae/            # 开发工具配置
-├── LICENSE           # GPL v3.0
-├── NOTICE.md         # 项目规范
-└── README.md         # 项目总览
+├── android/                    # MessageVault-Mobile (Kotlin/Android)
+│   ├── sdk/
+│   │   ├── backup/             # 纯Kotlin备份/恢复SDK
+│   │   ├── auth/               # 纯Kotlin认证组件
+│   │   └── storage/            # Android Library存储组件
+│   ├── app/                    # Android应用壳
+│   └── docs/architecture/      # 架构设计文档
+│       ├── harmonyos-adaptation.md
+│       ├── third-party-auth.md
+│       ├── ai-agent-integration.md
+│       └── backend-microservices.md
+├── previewer/                  # SMS-Previewer (Vue 3/Vite)
+├── .trae/                      # 开发工具配置
+├── LICENSE                     # GPL v3.0
+├── NOTICE.md                   # 项目规范
+└── README.md                   # 项目总览
 ```

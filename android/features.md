@@ -151,27 +151,69 @@
   - 内存使用监控
   - 电池消耗优化
 
+## 项目架构
+
+### 模块化架构
+
+项目已从单模块架构重构为多模块架构，核心逻辑提取为独立的SDK模块，实现关注点分离和跨平台复用：
+
+```
+MessageVault-Mobile/
+├── sdk/backup/          # 纯Kotlin备份/恢复SDK
+├── sdk/auth/            # 纯Kotlin认证组件
+├── sdk/storage/         # Android Library存储组件
+├── app/                 # Android应用壳
+└── docs/architecture/   # 架构设计文档
+```
+
+#### SDK模块职责
+
+| 模块 | 类型 | 职责 | 关键组件 |
+|------|------|------|---------|
+| `sdk/backup` | 纯Kotlin (java-library) | 备份/恢复核心逻辑 | `BackupManager`、`RestoreManager`、`BackupSerializer`、数据模型（`BackupData`、`Message`、`CallLog`、`Contact`）、读写接口（`SmsReader`/`SmsWriter`、`CallLogReader`/`CallLogWriter`、`ContactReader`/`ContactWriter`、`BackupFileReader`/`BackupFileWriter`） |
+| `sdk/auth` | 纯Kotlin (java-library) | 认证与身份管理 | `AuthProvider`接口、`LocalAuthProvider`（本地模式）、`ThirdPartyAuthProvider`接口（第三方登录扩展）、`AuthManager`（认证管理器）、`UserInfo`、`AuthResult`、`AuthCredentials` |
+| `sdk/storage` | Android Library | 存储抽象与实现 | `StorageProvider`接口、`LocalStorageProvider`（本地文件存储）、`RemoteStorageProvider`接口（远程存储）、Room数据库、Retrofit网络请求 |
+| `app` | Android Application | 应用壳 | UI（Jetpack Compose）、导航、权限管理、Android平台实现（`AndroidSmsReader`/`AndroidSmsWriter`等）、ViewModel |
+
+#### 模块依赖规则
+
+- `app` → `sdk/backup`、`sdk/auth`、`sdk/storage`
+- SDK模块之间**互不依赖**（`sdk/backup` 不依赖 `sdk/auth` 或 `sdk/storage`）
+- SDK模块**不依赖** `app`
+- `sdk/backup` 和 `sdk/auth` 为纯Kotlin模块，不包含任何Android依赖
+- `sdk/storage` 为Android Library，依赖Room、Retrofit等Android库
+
+#### 架构设计文档
+
+详细的架构设计文档位于 `docs/architecture/` 目录：
+
+- [鸿蒙适配设计文档](docs/architecture/harmonyos-adaptation.md) — 鸿蒙原生开发方案、KMP复用策略、权限差异分析
+- [第三方登录设计文档](docs/architecture/third-party-auth.md) — AuthProvider接口设计、OAuth2.0扩展、Token安全
+- [AI Agent集成设计文档](docs/architecture/ai-agent-integration.md) — 知识库架构、本地/云端AI模型、隐私保护
+- [后端微服务架构设计文档](docs/architecture/backend-microservices.md) — 服务拆分、API网关、NAS自部署方案
+
 ## 技术实现原则
 
 ### 1. 架构设计
 
 - **模块化**：
-  - 清晰的关注点分离
-  - 松耦合组件设计
-  - 依赖注入模式
+  - 清晰的关注点分离，核心逻辑与平台实现解耦
+  - SDK模块采用接口驱动设计，平台实现通过依赖注入
+  - 松耦合组件设计，SDK模块间零依赖
+  - 纯Kotlin SDK模块可跨平台复用（Android、鸿蒙、JVM）
 
 - **数据模型**：
-  - 三层数据模型架构
-    - 业务模型：处理应用内部逻辑（`model/`）
-    - UI模型：专用于UI展示（`models/`）
-    - 数据库实体：本地存储（`data/entity/`）
+  - SDK层数据模型：平台无关的纯数据类（`sdk/backup/model/`）
+  - 应用层UI模型：专用于UI展示（`app/model/`、`app/models/`）
+  - 存储层实体：本地数据库（`sdk/storage` Room实体）
   - 使用Kotlin数据类和扩展函数
   - 类型安全的转换逻辑
-  - JSON序列化（使用Gson）
+  - JSON序列化（使用Gson，封装在`BackupSerializer`中）
   - 版本化模型设计
   - 清晰的模型间映射关系
 
 - **API设计**：
+  - SDK接口定义平台无关契约（`SmsReader`、`StorageProvider`、`AuthProvider`）
   - RESTful接口
   - 使用Retrofit进行API调用
   - 可重试和缓存策略
@@ -209,8 +251,14 @@
 
 ### 4. 测试策略
 
-- **单元测试**：
+- **SDK模块测试**：
+  - `sdk/backup`：纯Kotlin单元测试，无需Android模拟器，覆盖`BackupManager`、`RestoreManager`、`BackupSerializer`及数据模型
+  - `sdk/auth`：纯Kotlin单元测试，覆盖`AuthProvider`接口契约、`LocalAuthProvider`逻辑、`AuthManager`委托模式
+  - `sdk/storage`：Android Instrumented测试，验证`LocalStorageProvider`文件操作、Room数据库交互
+
+- **应用层测试**：
   - 使用JUnit和Mockito
+  - 模拟SDK接口进行ViewModel测试
   - 模拟ContentProvider访问
   - 业务逻辑全覆盖
 
@@ -218,12 +266,19 @@
   - 使用AndroidX Test框架
   - Espresso UI测试
   - 端到端备份/恢复流程测试
+  - SDK与App集成验证
 
 - **CI/CD就绪**：
   - 测试可自动化
   - 关键流程回归测试
 
 ### 5. 可扩展性
+
+- **SDK接口扩展**：
+  - `SmsReader`/`SmsWriter`等接口可适配不同平台实现（Android、鸿蒙）
+  - `AuthProvider`接口支持新增第三方登录提供商
+  - `StorageProvider`接口支持新增存储后端（本地、云端、NAS）
+  - `ThirdPartyAuthProvider`接口为OAuth2.0扩展预留
 
 - **插件架构**：
   - 为未来功能预留扩展点
@@ -234,12 +289,14 @@
   - 适配器用于不同数据源
   - 策略模式用于可切换行为
   - 观察者用于事件通知
+  - 委托模式用于`AuthManager`
 
 - **未来扩展考虑**：
   - MMS消息支持
   - 联系人备份
   - 本地AI分析
   - 第三方服务连接选项
+  - 鸿蒙原生适配（复用纯Kotlin SDK模块）
 
 ## 从类似应用的见解
 
@@ -269,6 +326,13 @@
    - 稳健的错误处理和重试机制
 
 ## 优先级列表
+
+### ✅ 阶段0（SDK提取 — 已完成）：
+1. ✅ 提取 `sdk/backup` — 纯Kotlin备份/恢复SDK（BackupManager、RestoreManager、BackupSerializer、数据模型、读写接口）
+2. ✅ 提取 `sdk/auth` — 纯Kotlin认证组件（AuthProvider接口、LocalAuthProvider、ThirdPartyAuthProvider、AuthManager）
+3. ✅ 提取 `sdk/storage` — Android Library存储组件（StorageProvider接口、LocalStorageProvider、RemoteStorageProvider、Room）
+4. ✅ App模块适配 — Android平台实现注入SDK接口
+5. ✅ 架构设计文档 — 鸿蒙适配、第三方登录、AI Agent、后端微服务
 
 ### 阶段1（核心功能）：
 1. SMS和通话记录读取

@@ -24,17 +24,6 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
-        
-        // 配置Room架构
-        javaCompileOptions {
-            annotationProcessorOptions {
-                arguments += [
-                    "room.schemaLocation": "$projectDir/schemas",
-                    "room.incremental": "true",
-                    "room.expandProjection": "true"
-                ]
-            }
-        }
     }
     
     buildFeatures {
@@ -122,10 +111,10 @@ dependencies {
     // Gson
     implementation 'com.google.code.gson:gson:2.10.1'
     
-    // Room数据库
-    implementation 'androidx.room:room-runtime:2.6.1'
-    implementation 'androidx.room:room-ktx:2.6.1'
-    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    // SDK模块
+    implementation project(':sdk:backup')
+    implementation project(':sdk:auth')
+    implementation project(':sdk:storage')
     
     // WorkManager - 用于多线程后台任务
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
