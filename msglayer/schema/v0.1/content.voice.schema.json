@@ -10,7 +10,8 @@
   ],
   "properties": {
     "file": {
-      "type": "string"
+      "type": "string",
+      "format": "uri"
     },
     "transcript": {
       "type": "string"

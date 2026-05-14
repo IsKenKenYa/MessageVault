@@ -14,6 +14,13 @@ export function fetchLogin(params: Api.Auth.LoginParams) {
   })
 }
 
+export function fetchRegister(params: Api.Auth.RegisterParams) {
+  return request.post<Api.Auth.LoginResponse>({
+    url: '/api/auth/register',
+    params
+  })
+}
+
 /**
  * 获取用户信息
  * @returns 用户信息
@@ -21,9 +28,20 @@ export function fetchLogin(params: Api.Auth.LoginParams) {
 export function fetchGetUserInfo() {
   return request.get<Api.Auth.UserInfo>({
     url: '/api/user/info'
-    // 自定义请求头
-    // headers: {
-    //   'X-Custom-Header': 'your-custom-value'
-    // }
+  })
+}
+
+export function fetchRefreshToken(refreshToken: string) {
+  return request.post<Api.Auth.LoginResponse>({
+    url: '/api/auth/refresh',
+    params: { refreshToken },
+    showErrorMessage: false
+  })
+}
+
+export function fetchLogout() {
+  return request.post<{ success: boolean }>({
+    url: '/api/auth/logout',
+    showErrorMessage: false
   })
 }

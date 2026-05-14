@@ -1,0 +1,83 @@
+<template>
+  <div class="page-grid">
+    <section class="toolbar">
+      <ElInput v-model="filters.q" placeholder="Search timeline text" clearable />
+      <ElSelect v-model="filters.type" clearable placeholder="Event type">
+        <ElOption label="All" value="" />
+        <ElOption label="SMS" value="sms" />
+        <ElOption label="Call" value="call" />
+        <ElOption label="Voice" value="voice" />
+        <ElOption label="Contact Snapshot" value="contact_snapshot" />
+      </ElSelect>
+      <ElButton type="primary" @click="load">Apply</ElButton>
+    </section>
+
+    <section class="panel">
+      <ElTable :data="items" size="large" v-loading="loading">
+        <ElTableColumn prop="timestamp" label="Timestamp" min-width="190" />
+        <ElTableColumn prop="type" label="Type" width="130" />
+        <ElTableColumn prop="direction" label="Direction" width="120" />
+        <ElTableColumn prop="content_summary" label="Summary" min-width="320" />
+        <ElTableColumn label="Participants" min-width="240">
+          <template #default="{ row }">{{ row.participants.join(', ') }}</template>
+        </ElTableColumn>
+      </ElTable>
+    </section>
+  </div>
+</template>
+
+<script setup lang="ts">
+  import { fetchTimeline } from '@/api/commory'
+
+  defineOptions({ name: 'Timeline' })
+
+  const loading = ref(false)
+  const items = ref<Api.Commory.TimelineItem[]>([])
+  const filters = reactive<Api.Commory.SearchParams>({
+    q: '',
+    type: '',
+    limit: 200
+  })
+
+  const load = async () => {
+    loading.value = true
+    try {
+      items.value = await fetchTimeline(filters)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  onMounted(load)
+</script>
+
+<style scoped lang="scss">
+  .page-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .toolbar,
+  .panel {
+    background: var(--art-main-bg-color);
+    border: 1px solid var(--art-border-color);
+    border-radius: 8px;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) 180px 120px;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  @media (max-width: 900px) {
+    .toolbar {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

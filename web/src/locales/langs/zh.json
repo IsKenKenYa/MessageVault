@@ -189,6 +189,7 @@
     "subTitle": "欢迎加入我们，请填写以下信息完成注册",
     "placeholder": {
       "username": "请输入账号",
+      "email": "请输入邮箱",
       "password": "请输入密码",
       "confirmPassword": "请再次输入密码"
     },
@@ -244,7 +245,12 @@
     },
     "dashboard": {
       "title": "仪表盘",
-      "console": "工作台"
+      "console": "工作台",
+      "overview": "概览",
+      "timeline": "时间线",
+      "search": "检索",
+      "contacts": "联系人",
+      "imports": "导入"
     },
     "result": {
       "title": "结果页面",

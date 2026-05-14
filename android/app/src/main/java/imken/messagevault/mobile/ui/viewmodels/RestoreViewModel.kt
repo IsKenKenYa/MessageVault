@@ -281,7 +281,12 @@ class RestoreViewModel(
             }
 
             if (files != null) {
-                val validFiles = files.filter { validateBackupFile(it) }
+                val validFiles = mutableListOf<File>()
+                files.forEach { file ->
+                    if (validateBackupFile(file)) {
+                        validFiles += file
+                    }
+                }
                 backupFiles.addAll(validFiles.map { file ->
                     val deviceId = android.provider.Settings.Secure.getString(
                         context.contentResolver, android.provider.Settings.Secure.ANDROID_ID
@@ -311,9 +316,9 @@ class RestoreViewModel(
         backupFileReader.read(backupFile.filePath)?.toLegacyBackupData()
     }
 
-    private fun validateBackupFile(file: File): Boolean {
+    private suspend fun validateBackupFile(file: File): Boolean {
         if (!file.exists() || !file.isFile || !file.canRead()) return false
-        return runCatching { kotlinx.coroutines.runBlocking { backupFileReader.read(file.absolutePath) != null } }
+        return runCatching { backupFileReader.read(file.absolutePath) != null }
             .getOrDefault(false)
     }
 

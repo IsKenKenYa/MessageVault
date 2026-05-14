@@ -15,9 +15,45 @@ export const dashboardRoutes: AppRouteRecord = {
       name: 'Console',
       component: '/dashboard/console',
       meta: {
-        title: 'menus.dashboard.console',
+        title: 'menus.dashboard.overview',
         keepAlive: false,
         fixedTab: true
+      }
+    },
+    {
+      path: 'timeline',
+      name: 'Timeline',
+      component: '/dashboard/timeline',
+      meta: {
+        title: 'menus.dashboard.timeline',
+        keepAlive: true
+      }
+    },
+    {
+      path: 'search',
+      name: 'SearchRecords',
+      component: '/dashboard/search',
+      meta: {
+        title: 'menus.dashboard.search',
+        keepAlive: true
+      }
+    },
+    {
+      path: 'contacts',
+      name: 'Contacts',
+      component: '/dashboard/contacts',
+      meta: {
+        title: 'menus.dashboard.contacts',
+        keepAlive: true
+      }
+    },
+    {
+      path: 'imports',
+      name: 'Imports',
+      component: '/dashboard/imports',
+      meta: {
+        title: 'menus.dashboard.imports',
+        keepAlive: true
       }
     }
   ]

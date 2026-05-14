@@ -1,7 +1,9 @@
 package imken.messagevault.sdk.backup.msglayer.model
 
+const val MSG_LAYER_VERSION = "msglayer/v0.1"
+
 data class MsgLayerRootExport(
-    val version: String = "msglayer/v0.1",
+    val version: String = MSG_LAYER_VERSION,
     val exportedAt: String,
     val source: MsgLayerSource,
     val identities: List<MsgLayerIdentity>,

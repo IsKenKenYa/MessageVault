@@ -13,8 +13,10 @@
     },
     "attachments": {
       "type": "array",
+      "description": "Attachment references should be URI strings when present.",
       "items": {
-        "type": "string"
+        "type": "string",
+        "format": "uri"
       }
     }
   },

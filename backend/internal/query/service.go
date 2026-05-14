@@ -27,18 +27,18 @@ func (s Service) Timeline(ctx context.Context, params msglayer.SearchParams) ([]
 	return s.store.Timeline(ctx, params)
 }
 
-func (s Service) Event(ctx context.Context, id string) (msglayer.TimelineItem, error) {
-	return s.store.GetEvent(ctx, id)
+func (s Service) Event(ctx context.Context, userID, id string) (msglayer.TimelineItem, error) {
+	return s.store.GetEvent(ctx, userID, id)
 }
 
-func (s Service) Thread(ctx context.Context, id string) ([]msglayer.TimelineItem, error) {
-	return s.store.GetThread(ctx, id)
+func (s Service) Thread(ctx context.Context, userID, id string) ([]msglayer.TimelineItem, error) {
+	return s.store.GetThread(ctx, userID, id)
 }
 
-func (s Service) Identities(ctx context.Context) ([]msglayer.Identity, error) {
-	return s.store.ListIdentities(ctx)
+func (s Service) Identities(ctx context.Context, userID string) ([]msglayer.Identity, error) {
+	return s.store.ListIdentities(ctx, userID)
 }
 
-func (s Service) Identity(ctx context.Context, id string) (msglayer.Identity, error) {
-	return s.store.GetIdentity(ctx, id)
+func (s Service) Identity(ctx context.Context, userID, id string) (msglayer.Identity, error) {
+	return s.store.GetIdentity(ctx, userID, id)
 }

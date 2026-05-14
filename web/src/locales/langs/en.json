@@ -189,6 +189,7 @@
     "subTitle": "Welcome to join us, please fill in the following information to complete the registration",
     "placeholder": {
       "username": "Please enter your account",
+      "email": "Please enter your email",
       "password": "Please enter your password",
       "confirmPassword": "Please enter your password again"
     },
@@ -244,7 +245,12 @@
     },
     "dashboard": {
       "title": "Dashboard",
-      "console": "Console"
+      "console": "Console",
+      "overview": "Overview",
+      "timeline": "Timeline",
+      "search": "Search",
+      "contacts": "Contacts",
+      "imports": "Imports"
     },
     "result": {
       "title": "Result Page",

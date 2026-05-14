@@ -39,6 +39,63 @@ func TestValidationFailsForUnknownEventType(t *testing.T) {
 	}
 }
 
+func TestValidationFailsForEmptyParticipant(t *testing.T) {
+	root := projectPath("msglayer", "schema", "v0.1", "root.schema.json")
+	validator, err := NewValidator(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload := []byte(`{
+	  "version": "msglayer/v0.1",
+	  "exported_at": "2026-01-01T12:00:00Z",
+	  "source": {"platform":"android","device_id":"x","app_version":"0.1"},
+	  "identities": [{"id":"self/x","type":"device","display_name":"x","phones":[],"emails":[],"labels":["self"],"meta":{}}],
+	  "events": [{"id":"e1","type":"sms","timestamp":"2026-01-01T12:00:00Z","direction":"inbound","participants":[""],"content":{"text":"hi","attachments":[]},"meta":{},"relations":[]}]
+	}`)
+	if err := validator.ValidateBytes(payload); err == nil {
+		t.Fatal("expected participant validation to fail")
+	}
+}
+
+func TestValidationFailsForVoiceDirection(t *testing.T) {
+	root := projectPath("msglayer", "schema", "v0.1", "root.schema.json")
+	validator, err := NewValidator(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload := []byte(`{
+	  "version": "msglayer/v0.1",
+	  "exported_at": "2026-01-01T12:00:00Z",
+	  "source": {"platform":"android","device_id":"x","app_version":"0.1"},
+	  "identities": [{"id":"self/x","type":"device","display_name":"x","phones":[],"emails":[],"labels":["self"],"meta":{}}],
+	  "events": [{"id":"voice_1","type":"voice","timestamp":"2026-01-01T12:00:00Z","direction":"system","participants":["self/x"],"content":{"file":"file://voice/001.mp3","transcript":"hi","summary":"hi"},"meta":{},"relations":[]}]
+	}`)
+	if err := validator.ValidateBytes(payload); err == nil {
+		t.Fatal("expected voice direction validation to fail")
+	}
+}
+
+func TestValidationFailsForRelationType(t *testing.T) {
+	root := projectPath("msglayer", "schema", "v0.1", "root.schema.json")
+	validator, err := NewValidator(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload := []byte(`{
+	  "version": "msglayer/v0.1",
+	  "exported_at": "2026-01-01T12:00:00Z",
+	  "source": {"platform":"android","device_id":"x","app_version":"0.1"},
+	  "identities": [{"id":"self/x","type":"device","display_name":"x","phones":[],"emails":[],"labels":["self"],"meta":{}}],
+	  "events": [{"id":"e1","type":"sms","timestamp":"2026-01-01T12:00:00Z","direction":"inbound","participants":["self/x"],"content":{"text":"hi","attachments":[]},"meta":{},"relations":[{"type":"bad_relation","target":"x"}]}]
+	}`)
+	if err := validator.ValidateBytes(payload); err == nil {
+		t.Fatal("expected relation validation to fail")
+	}
+}
+
 func projectPath(parts ...string) string {
 	_, file, _, _ := runtime.Caller(0)
 	base := filepath.Join(filepath.Dir(file), "..", "..", "..")

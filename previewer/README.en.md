@@ -2,6 +2,8 @@
 
 A clean and elegant SMS backup viewer for SMS Backup & Restore exported files
 
+> Deprecated: the maintained archive experience now lives in the main `web` application. This standalone previewer remains only as historical reference.
+
 ## 💝 Special Thanks
 
 This project wouldn't be possible without [SMS Backup & Restore](https://play.google.com/store/apps/details?id=com.riteshsahu.SMSBackupRestore). This excellent Android app inspired the creation of this project, aiming to provide users with a better SMS backup browsing experience.

@@ -1,5 +1,7 @@
 package msglayer
 
+const Version = "msglayer/v0.1"
+
 type RootExport struct {
 	Version    string         `json:"version"`
 	ExportedAt string         `json:"exported_at"`
@@ -43,6 +45,7 @@ type Relation struct {
 }
 
 type SearchParams struct {
+	UserID      string
 	Keyword     string
 	ContactID   string
 	Type        string

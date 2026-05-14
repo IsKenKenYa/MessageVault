@@ -17,6 +17,8 @@ import (
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
 )
 
+const cliUserID = "cli-user"
+
 func Execute(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		printUsage(stdout)
@@ -60,7 +62,7 @@ func runServe(ctx context.Context, stdout io.Writer) error {
 		return err
 	}
 	defer store.Close()
-	server := api.NewServer(store, validator)
+	server := api.NewServer(cfg, store, validator)
 	httpServer := &http.Server{Addr: cfg.ListenAddr, Handler: server.Handler()}
 	go func() {
 		<-ctx.Done()
@@ -86,7 +88,7 @@ func runImport(ctx context.Context, path string, stdout io.Writer) error {
 	if err := validator.ValidateBytes(raw); err != nil {
 		return err
 	}
-	importID, err := store.Import(ctx, path, export, raw)
+	importID, err := store.Import(ctx, cliUserID, path, export, raw)
 	if err != nil {
 		return err
 	}
@@ -114,6 +116,7 @@ func runQuery(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("query", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	var params msglayer.SearchParams
+	params.UserID = cliUserID
 	params.Limit = 100
 	flags.StringVar(&params.ContactID, "contact", "", "")
 	flags.StringVar(&params.Type, "type", "", "")
@@ -141,6 +144,7 @@ func runTimeline(ctx context.Context, args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("timeline", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	var params msglayer.SearchParams
+	params.UserID = cliUserID
 	params.Limit = 100
 	flags.StringVar(&params.From, "from", "", "")
 	flags.StringVar(&params.To, "to", "", "")
@@ -170,7 +174,7 @@ func runContacts(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	defer store.Close()
-	items, err := query.New(store).Identities(ctx)
+	items, err := query.New(store).Identities(ctx, cliUserID)
 	if err != nil {
 		return err
 	}
@@ -195,7 +199,7 @@ func runExport(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 	defer store.Close()
-	raw, err := store.ExportImport(ctx, importID)
+	raw, err := store.ExportImport(ctx, cliUserID, importID)
 	if err != nil {
 		return err
 	}

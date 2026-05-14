@@ -37,7 +37,8 @@
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "format": "uri"
     },
     "labels": {
       "$ref": "common.schema.json#/definitions/stringArray"

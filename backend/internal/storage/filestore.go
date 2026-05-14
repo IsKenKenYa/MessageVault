@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,22 +16,34 @@ import (
 )
 
 type storeSnapshot struct {
-	Imports    map[string]storedImport      `json:"imports"`
-	Identities map[string]msglayer.Identity `json:"identities"`
-	Events     map[string]storedEvent       `json:"events"`
+	Users         map[string]UserRecord         `json:"users"`
+	RefreshTokens map[string]RefreshTokenRecord `json:"refresh_tokens"`
+	Imports       map[string]storedImport       `json:"imports"`
+	Identities    map[string]storedIdentity     `json:"identities"`
+	Events        map[string]storedEvent        `json:"events"`
 }
 
 type storedImport struct {
 	ID            string `json:"id"`
+	UserID        string `json:"user_id"`
 	SchemaVersion string `json:"schema_version"`
 	ImportedAt    string `json:"imported_at"`
 	SourcePath    string `json:"source_path"`
 	RawJSON       string `json:"raw_json"`
+	EventCount    int    `json:"event_count"`
+	IdentityCount int    `json:"identity_count"`
+}
+
+type storedIdentity struct {
+	UserID   string            `json:"user_id"`
+	Identity msglayer.Identity `json:"identity"`
 }
 
 type storedEvent struct {
-	Item msglayer.TimelineItem `json:"item"`
-	Raw  msglayer.Event        `json:"raw"`
+	UserID   string               `json:"user_id"`
+	ImportID string               `json:"import_id"`
+	Item     msglayer.TimelineItem `json:"item"`
+	Raw      msglayer.Event        `json:"raw"`
 }
 
 type fileStore struct {
@@ -40,14 +53,16 @@ type fileStore struct {
 	snapshot storeSnapshot
 }
 
-func newSQLStore(path, name string) Provider {
+func newFileStore(path, name string) Provider {
 	return &fileStore{
 		name: name,
 		path: path,
 		snapshot: storeSnapshot{
-			Imports:    map[string]storedImport{},
-			Identities: map[string]msglayer.Identity{},
-			Events:     map[string]storedEvent{},
+			Users:         map[string]UserRecord{},
+			RefreshTokens: map[string]RefreshTokenRecord{},
+			Imports:       map[string]storedImport{},
+			Identities:    map[string]storedIdentity{},
+			Events:        map[string]storedEvent{},
 		},
 	}
 }
@@ -74,7 +89,7 @@ func (s *fileStore) Init(ctx context.Context) error {
 	return json.Unmarshal(data, &s.snapshot)
 }
 
-func (s *fileStore) Import(ctx context.Context, sourcePath string, export msglayer.RootExport, raw []byte) (string, error) {
+func (s *fileStore) Import(ctx context.Context, userID string, sourcePath string, export msglayer.RootExport, raw []byte) (string, error) {
 	_ = ctx
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -82,16 +97,24 @@ func (s *fileStore) Import(ctx context.Context, sourcePath string, export msglay
 	importID := fmt.Sprintf("import_%d", time.Now().UnixNano())
 	s.snapshot.Imports[importID] = storedImport{
 		ID:            importID,
+		UserID:        userID,
 		SchemaVersion: export.Version,
 		ImportedAt:    time.Now().UTC().Format(time.RFC3339),
 		SourcePath:    sourcePath,
 		RawJSON:       string(raw),
+		EventCount:    len(export.Events),
+		IdentityCount: len(export.Identities),
 	}
 	for _, identity := range export.Identities {
-		s.snapshot.Identities[identity.ID] = identity
+		s.snapshot.Identities[scopeKey(userID, identity.ID)] = storedIdentity{
+			UserID:   userID,
+			Identity: identity,
+		}
 	}
 	for _, event := range export.Events {
-		s.snapshot.Events[event.ID] = storedEvent{
+		s.snapshot.Events[scopeKey(userID, event.ID)] = storedEvent{
+			UserID:   userID,
+			ImportID: importID,
 			Item: msglayer.TimelineItem{
 				EventID:        event.ID,
 				Type:           event.Type,
@@ -108,49 +131,77 @@ func (s *fileStore) Import(ctx context.Context, sourcePath string, export msglay
 	return importID, s.persist()
 }
 
-func (s *fileStore) ExportImport(ctx context.Context, importID string) ([]byte, error) {
+func (s *fileStore) ListImports(ctx context.Context, userID string) ([]ImportSummary, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]ImportSummary, 0, len(s.snapshot.Imports))
+	for _, item := range s.snapshot.Imports {
+		if item.UserID != userID {
+			continue
+		}
+		importedAt, _ := time.Parse(time.RFC3339, item.ImportedAt)
+		items = append(items, ImportSummary{
+			ID:            item.ID,
+			UserID:        item.UserID,
+			SchemaVersion: item.SchemaVersion,
+			ImportedAt:    importedAt,
+			SourcePath:    item.SourcePath,
+			EventCount:    item.EventCount,
+			IdentityCount: item.IdentityCount,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ImportedAt.After(items[j].ImportedAt) })
+	return items, nil
+}
+
+func (s *fileStore) ExportImport(ctx context.Context, userID, importID string) ([]byte, error) {
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if importID == "" {
 		var err error
-		importID, err = s.latestImportIDLocked()
+		importID, err = s.latestImportIDLocked(userID)
 		if err != nil {
 			return nil, err
 		}
 	}
 	item, ok := s.snapshot.Imports[importID]
-	if !ok {
+	if !ok || item.UserID != userID {
 		return nil, fmt.Errorf("import not found: %s", importID)
 	}
 	return []byte(item.RawJSON), nil
 }
 
-func (s *fileStore) LatestImportID(ctx context.Context) (string, error) {
+func (s *fileStore) LatestImportID(ctx context.Context, userID string) (string, error) {
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.latestImportIDLocked()
+	return s.latestImportIDLocked(userID)
 }
 
-func (s *fileStore) latestImportIDLocked() (string, error) {
-	if len(s.snapshot.Imports) == 0 {
-		return "", fmt.Errorf("no imports found")
-	}
+func (s *fileStore) latestImportIDLocked(userID string) (string, error) {
 	imports := make([]storedImport, 0, len(s.snapshot.Imports))
 	for _, item := range s.snapshot.Imports {
+		if item.UserID != userID {
+			continue
+		}
 		imports = append(imports, item)
+	}
+	if len(imports) == 0 {
+		return "", fmt.Errorf("no imports found")
 	}
 	sort.Slice(imports, func(i, j int) bool { return imports[i].ImportedAt > imports[j].ImportedAt })
 	return imports[0].ID, nil
 }
 
-func (s *fileStore) GetEvent(ctx context.Context, id string) (msglayer.TimelineItem, error) {
+func (s *fileStore) GetEvent(ctx context.Context, userID, id string) (msglayer.TimelineItem, error) {
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	item, ok := s.snapshot.Events[id]
-	if !ok {
+	item, ok := s.snapshot.Events[scopeKey(userID, id)]
+	if !ok || item.UserID != userID {
 		return msglayer.TimelineItem{}, fmt.Errorf("event not found: %s", id)
 	}
 	return item.Item, nil
@@ -175,6 +226,9 @@ func (s *fileStore) filterEvents(ctx context.Context, params msglayer.SearchPara
 
 	var items []msglayer.TimelineItem
 	for _, stored := range s.snapshot.Events {
+		if stored.UserID != params.UserID {
+			continue
+		}
 		if keywordOnly && params.Keyword == "" {
 			continue
 		}
@@ -190,6 +244,7 @@ func (s *fileStore) filterEvents(ctx context.Context, params msglayer.SearchPara
 		if params.Type != "" && stored.Item.Type != params.Type {
 			continue
 		}
+		// Timestamp ordering/filtering relies on normalized UTC RFC3339 strings.
 		if params.From != "" && stored.Item.Timestamp < params.From {
 			continue
 		}
@@ -205,35 +260,41 @@ func (s *fileStore) filterEvents(ctx context.Context, params msglayer.SearchPara
 	return items, nil
 }
 
-func (s *fileStore) ListIdentities(ctx context.Context) ([]msglayer.Identity, error) {
+func (s *fileStore) ListIdentities(ctx context.Context, userID string) ([]msglayer.Identity, error) {
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	items := make([]msglayer.Identity, 0, len(s.snapshot.Identities))
 	for _, identity := range s.snapshot.Identities {
-		items = append(items, identity)
+		if identity.UserID != userID {
+			continue
+		}
+		items = append(items, identity.Identity)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].DisplayName < items[j].DisplayName })
 	return items, nil
 }
 
-func (s *fileStore) GetIdentity(ctx context.Context, id string) (msglayer.Identity, error) {
+func (s *fileStore) GetIdentity(ctx context.Context, userID, id string) (msglayer.Identity, error) {
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	identity, ok := s.snapshot.Identities[id]
-	if !ok {
+	identity, ok := s.snapshot.Identities[scopeKey(userID, id)]
+	if !ok || identity.UserID != userID {
 		return msglayer.Identity{}, fmt.Errorf("identity not found: %s", id)
 	}
-	return identity, nil
+	return identity.Identity, nil
 }
 
-func (s *fileStore) GetThread(ctx context.Context, threadID string) ([]msglayer.TimelineItem, error) {
+func (s *fileStore) GetThread(ctx context.Context, userID, threadID string) ([]msglayer.TimelineItem, error) {
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var items []msglayer.TimelineItem
 	for _, stored := range s.snapshot.Events {
+		if stored.UserID != userID {
+			continue
+		}
 		for _, relation := range stored.Raw.Relations {
 			if relation.Type == "same_thread" && relation.Target == threadID {
 				items = append(items, stored.Item)
@@ -243,6 +304,74 @@ func (s *fileStore) GetThread(ctx context.Context, threadID string) ([]msglayer.
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Timestamp < items[j].Timestamp })
 	return items, nil
+}
+
+func (s *fileStore) CreateUser(ctx context.Context, user UserRecord) (UserRecord, error) {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.snapshot.Users {
+		if strings.EqualFold(existing.UserName, user.UserName) {
+			return UserRecord{}, fmt.Errorf("username already exists")
+		}
+	}
+	s.snapshot.Users[user.ID] = user
+	return user, s.persist()
+}
+
+func (s *fileStore) FindUserByUserName(ctx context.Context, userName string) (UserRecord, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, user := range s.snapshot.Users {
+		if strings.EqualFold(user.UserName, userName) {
+			return user, nil
+		}
+	}
+	return UserRecord{}, fmt.Errorf("user not found")
+}
+
+func (s *fileStore) GetUser(ctx context.Context, userID string) (UserRecord, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	user, ok := s.snapshot.Users[userID]
+	if !ok {
+		return UserRecord{}, fmt.Errorf("user not found")
+	}
+	return user, nil
+}
+
+func (s *fileStore) SaveRefreshToken(ctx context.Context, token RefreshTokenRecord) error {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.RefreshTokens[token.ID] = token
+	return s.persist()
+}
+
+func (s *fileStore) ConsumeRefreshToken(ctx context.Context, tokenHash string) (RefreshTokenRecord, error) {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, token := range s.snapshot.RefreshTokens {
+		if token.TokenHash != tokenHash {
+			continue
+		}
+		if !token.RevokedAt.IsZero() {
+			return RefreshTokenRecord{}, fmt.Errorf("refresh token revoked")
+		}
+		if time.Now().After(token.ExpiresAt) {
+			return RefreshTokenRecord{}, fmt.Errorf("refresh token expired")
+		}
+		token.RevokedAt = time.Now().UTC()
+		s.snapshot.RefreshTokens[key] = token
+		if err := s.persist(); err != nil {
+			return RefreshTokenRecord{}, err
+		}
+		return token, nil
+	}
+	return RefreshTokenRecord{}, fmt.Errorf("refresh token not found")
 }
 
 func EnsureParentDir(path string) error {
@@ -259,6 +388,11 @@ func (s *fileStore) persist() error {
 		return err
 	}
 	return os.WriteFile(s.path, data, 0o644)
+}
+
+func scopeKey(userID, rawID string) string {
+	hash := sha1.Sum([]byte(userID))
+	return fmt.Sprintf("%x:%s", hash[:4], rawID)
 }
 
 func summarizeEvent(event msglayer.Event) string {

@@ -28,6 +28,7 @@ import timber.log.Timber
 
 class BackupViewModel(
     private val backupManager: BackupManager,
+    private val deviceIdProvider: () -> String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
@@ -64,16 +65,12 @@ class BackupViewModel(
         viewModelScope.launch(dispatcher) {
             try {
                 val deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL}"
-                val deviceId = Settings.Secure.getString(
-                    context.contentResolver,
-                    Settings.Secure.ANDROID_ID
-                ) ?: "unknown-device"
                 val result = backupManager.performBackup(
                     hasSmsPermission = true,
                     hasCallLogPermission = true,
                     hasContactsPermission = true,
                     deviceInfo = deviceInfo,
-                    deviceId = deviceId,
+                    deviceId = deviceIdProvider(),
                     appVersion = BuildConfig.VERSION_NAME
                 )
                 if (result.success) {
@@ -104,7 +101,15 @@ class BackupViewModel(
                     callLogWriter = AndroidCallLogWriter(context),
                     contactWriter = AndroidContactWriter(context)
                 )
-                return BackupViewModel(backupManager) as T
+                return BackupViewModel(
+                    backupManager = backupManager,
+                    deviceIdProvider = {
+                        Settings.Secure.getString(
+                            context.contentResolver,
+                            Settings.Secure.ANDROID_ID
+                        ) ?: "unknown-device"
+                    }
+                ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

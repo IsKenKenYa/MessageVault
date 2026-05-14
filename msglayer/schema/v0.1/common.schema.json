@@ -17,7 +17,9 @@
       }
     },
     "meta": {
-      "type": "object"
+      "type": "object",
+      "description": "Open-ended metadata bag for source-specific fields that are intentionally not standardized in v0.1.",
+      "additionalProperties": true
     }
   }
 }

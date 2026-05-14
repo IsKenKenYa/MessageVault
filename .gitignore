@@ -42,3 +42,4 @@ coverage/
 
 # Trae
 .trae/
+.playwright-mcp/

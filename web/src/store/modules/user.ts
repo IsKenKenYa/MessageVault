@@ -130,6 +130,7 @@ export const useUserStore = defineStore(
      */
     const setToken = (newAccessToken: string, newRefreshToken?: string) => {
       accessToken.value = newAccessToken
+      isLogin.value = Boolean(newAccessToken)
       if (newRefreshToken) {
         refreshToken.value = newRefreshToken
       }

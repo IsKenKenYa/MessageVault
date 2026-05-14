@@ -37,7 +37,7 @@ func TestSQLiteImportAndQuery(t *testing.T) {
 	if err := validator.ValidateBytes(raw); err != nil {
 		t.Fatal(err)
 	}
-	importID, err := store.Import(ctx, sample, export, raw)
+	importID, err := store.Import(ctx, "test-user", sample, export, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestSQLiteImportAndQuery(t *testing.T) {
 		t.Fatal("expected import id")
 	}
 
-	items, err := store.Search(ctx, msglayer.SearchParams{Keyword: "验证码", Limit: 10})
+	items, err := store.Search(ctx, msglayer.SearchParams{UserID: "test-user", Keyword: "验证码", Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestSQLiteImportAndQuery(t *testing.T) {
 		t.Fatal("expected keyword search hits")
 	}
 
-	thread, err := store.GetThread(ctx, "thread_42")
+	thread, err := store.GetThread(ctx, "test-user", "thread_42")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestSQLiteImportAndQuery(t *testing.T) {
 		t.Fatal("expected thread reconstruction results")
 	}
 
-	rawExport, err := store.ExportImport(ctx, "")
+	rawExport, err := store.ExportImport(ctx, "test-user", "")
 	if err != nil {
 		t.Fatal(err)
 	}

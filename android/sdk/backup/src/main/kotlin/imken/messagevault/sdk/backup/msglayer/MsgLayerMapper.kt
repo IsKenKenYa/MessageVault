@@ -107,6 +107,7 @@ class MsgLayerMapper {
             )
         }
 
+        // String sorting is safe here because all timestamps are normalized to UTC RFC3339.
         return MsgLayerRootExport(
             exportedAt = exportedAt,
             source = MsgLayerSource(
@@ -176,13 +177,16 @@ class MsgLayerMapper {
     }
 
     private fun Message.toSmsDirection(): String = when (type) {
-        2 -> "outbound"
+        1 -> "inbound"
+        2, 4, 5, 6 -> "outbound"
+        3 -> "outbound"
         else -> "inbound"
     }
 
     private fun CallLog.toCallDirection(): String = when (type) {
         2 -> "outbound"
         3 -> "inbound"
+        5 -> "missed"
         else -> "missed"
     }
 

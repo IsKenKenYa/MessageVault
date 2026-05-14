@@ -72,16 +72,76 @@ declare namespace Api {
     interface LoginResponse {
       token: string
       refreshToken: string
+      user?: UserInfo
+    }
+
+    interface RegisterParams {
+      userName: string
+      email: string
+      password: string
     }
 
     /** 用户信息 */
     interface UserInfo {
       buttons: string[]
       roles: string[]
-      userId: number
+      userId: string
       userName: string
       email: string
       avatar?: string
+    }
+  }
+
+  namespace Commory {
+    interface ImportSummary {
+      id: string
+      user_id: string
+      schema_version: string
+      imported_at: string
+      source_path: string
+      event_count: number
+      identity_count: number
+    }
+
+    interface TimelineItem {
+      event_id: string
+      type: string
+      timestamp: string
+      direction: string
+      content_summary: string
+      participants: string[]
+      meta?: Record<string, any>
+      schema_version: string
+    }
+
+    interface Identity {
+      id: string
+      type: string
+      display_name: string
+      phones: string[]
+      emails: string[]
+      avatar?: string | null
+      labels: string[]
+      meta: Record<string, any>
+    }
+
+    interface DashboardSummary {
+      importCount: number
+      identityCount: number
+      eventCount: number
+      lastActivity: string
+      recentImports: ImportSummary[]
+      recentEvents: TimelineItem[]
+    }
+
+    interface SearchParams {
+      q?: string
+      contact?: string
+      type?: string
+      participant?: string
+      from?: string
+      to?: string
+      limit?: number
     }
   }
 

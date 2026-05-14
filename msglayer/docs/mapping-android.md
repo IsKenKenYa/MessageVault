@@ -48,6 +48,7 @@ Every exported identity from contacts also generates a `contact_snapshot` event:
 - `Message.type` -> `direction`
   - `1` => `inbound`
   - `2` => `outbound`
+  - `3/4/5/6` => exported as `outbound` for schema compatibility while preserving the original Android type in `meta.raw_type`
   - fallback => `inbound`
 - `Message.address` -> participant identity resolution input
 - `Message.body` -> `content.text`
@@ -64,6 +65,8 @@ Every exported identity from contacts also generates a `contact_snapshot` event:
 - `CallLog.duration` -> `content.duration_sec`
 - `CallLog.contact` -> `meta.contact_name`
 
+Timestamp ordering in exports relies on the mapper normalizing all event timestamps to UTC RFC3339 before sorting.
+
 ## Restore Boundary
 
 `MsgLayer` is now the primary export format.
@@ -75,3 +78,14 @@ Current restore compatibility is maintained by converting `MsgLayer` events back
 - `identity/contact_snapshot` -> `ContactData`
 
 This keeps restore behavior working while the write path moves to the new standard.
+
+## Known Data Loss On Round-Trip
+
+The `MsgLayer -> legacy restore DTO` bridge intentionally preserves compatibility over perfect fidelity in v0.1.
+
+Known losses today:
+
+- contact `groups`, `websites`, and `note` remain in identity metadata only
+- avatar/photo data is not restored into the legacy contact DTO
+- legacy Android raw message/call types remain metadata, not first-class restore fields
+- non-numeric event IDs fall back to derived numeric IDs during restore bridging

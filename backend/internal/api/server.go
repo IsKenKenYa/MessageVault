@@ -3,164 +3,453 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/IsKenKenYa/Commory/backend/internal/auth"
+	"github.com/IsKenKenYa/Commory/backend/internal/config"
 	"github.com/IsKenKenYa/Commory/backend/internal/importers"
 	"github.com/IsKenKenYa/Commory/backend/internal/msglayer"
 	"github.com/IsKenKenYa/Commory/backend/internal/query"
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
 )
 
+const refreshCookieName = "commory_refresh_token"
+
 type Server struct {
-	store     storage.Provider
-	service   query.Service
-	validator *msglayer.Validator
-	importer  importers.Importer
+	cfg        config.Config
+	store      storage.Provider
+	service    query.Service
+	auth       *auth.Service
+	validator  *msglayer.Validator
+	importer   importers.Importer
 }
 
-func NewServer(store storage.Provider, validator *msglayer.Validator) *Server {
+func NewServer(cfg config.Config, store storage.Provider, validator *msglayer.Validator) *Server {
 	return &Server{
+		cfg:       cfg,
 		store:     store,
 		service:   query.New(store),
+		auth:      auth.NewService(store, cfg.AuthSecret),
 		validator: validator,
 		importer:  importers.JSONImporter{},
 	}
 }
 
 func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/imports", s.handleImports)
-	mux.HandleFunc("/api/validate", s.handleValidate)
-	mux.HandleFunc("/api/events", s.handleEvents)
-	mux.HandleFunc("/api/events/", s.handleEvent)
-	mux.HandleFunc("/api/timeline", s.handleTimeline)
-	mux.HandleFunc("/api/identities", s.handleIdentities)
-	mux.HandleFunc("/api/identities/", s.handleIdentity)
-	mux.HandleFunc("/api/search", s.handleSearch)
-	mux.HandleFunc("/api/threads/", s.handleThread)
-	return mux
+	publicMux := http.NewServeMux()
+	publicMux.HandleFunc("/api/auth/register", s.handleRegister)
+	publicMux.HandleFunc("/api/auth/login", s.handleLogin)
+	publicMux.HandleFunc("/api/auth/refresh", s.handleRefresh)
+	publicMux.HandleFunc("/api/auth/logout", s.handleLogout)
+
+	privateMux := http.NewServeMux()
+	privateMux.HandleFunc("/api/user/info", s.handleUserInfo)
+	privateMux.HandleFunc("/api/imports", s.handleImports)
+	privateMux.HandleFunc("/api/imports/", s.handleImportExport)
+	privateMux.HandleFunc("/api/imports/upload", s.handleImportUpload)
+	privateMux.HandleFunc("/api/imports/path", s.handleImportPath)
+	privateMux.HandleFunc("/api/validate/upload", s.handleValidateUpload)
+	privateMux.HandleFunc("/api/validate/path", s.handleValidatePath)
+	privateMux.HandleFunc("/api/dashboard", s.handleDashboard)
+	privateMux.HandleFunc("/api/events", s.handleEvents)
+	privateMux.HandleFunc("/api/events/", s.handleEvent)
+	privateMux.HandleFunc("/api/timeline", s.handleTimeline)
+	privateMux.HandleFunc("/api/identities", s.handleIdentities)
+	privateMux.HandleFunc("/api/identities/", s.handleIdentity)
+	privateMux.HandleFunc("/api/search", s.handleSearch)
+	privateMux.HandleFunc("/api/threads/", s.handleThread)
+
+	root := http.NewServeMux()
+	root.Handle("/api/auth/", publicMux)
+	root.Handle("/api/", auth.Middleware(s.auth, privateMux))
+	return root
 }
 
-func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	var req struct {
-		Path string `json:"path"`
+		UserName string `json:"userName"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	export, raw, err := s.importer.Import(req.Path)
+	user, pair, err := s.auth.Register(r.Context(), req.UserName, req.Email, req.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	setRefreshCookie(w, pair.RefreshToken)
+	writeJSON(w, http.StatusCreated, "registered", map[string]any{
+		"user":         user,
+		"token":        pair.AccessToken,
+		"refreshToken": pair.RefreshToken,
+	})
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req struct {
+		UserName string `json:"userName"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	user, pair, err := s.auth.Login(r.Context(), r.RemoteAddr, req.UserName, req.Password)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	setRefreshCookie(w, pair.RefreshToken)
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"user":         user,
+		"token":        pair.AccessToken,
+		"refreshToken": pair.RefreshToken,
+	})
+}
+
+func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	refreshToken := req.RefreshToken
+	if refreshToken == "" {
+		if cookie, err := r.Cookie(refreshCookieName); err == nil {
+			refreshToken = cookie.Value
+		}
+	}
+	pair, err := s.auth.Refresh(r.Context(), refreshToken)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	setRefreshCookie(w, pair.RefreshToken)
+	writeJSON(w, http.StatusOK, "ok", pair)
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	clearRefreshCookie(w)
+	writeJSON(w, http.StatusOK, "logged out", map[string]any{"success": true})
+}
+
+func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	user, err := s.auth.UserInfo(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", user)
+}
+
+func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	userID := auth.UserIDFromContext(r.Context())
+	items, err := s.store.ListImports(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", items)
+}
+
+func (s *Server) handleImportExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/api/imports/")
+	if !strings.HasSuffix(path, "/export") {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	importID := strings.TrimSuffix(path, "/export")
+	importID = strings.TrimSuffix(importID, "/")
+	raw, err := s.store.ExportImport(r.Context(), auth.UserIDFromContext(r.Context()), importID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", importID+".json"))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(raw)
+}
+
+func (s *Server) handleImportUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	userID := auth.UserIDFromContext(r.Context())
+	raw, sourceName, err := readUpload(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	export, raw, err := s.importer.ImportBytes(raw)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := s.validator.ValidateBytes(raw); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	importID, err := s.store.Import(r.Context(), req.Path, export, raw)
+	importID, err := s.store.Import(r.Context(), userID, sourceName, export, raw)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
+	writeJSON(w, http.StatusCreated, "imported", map[string]any{
 		"import_id":        importID,
 		"msglayer_version": export.Version,
 	})
 }
 
-func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleImportPath(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := s.requireAdmin(r.Context()); err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
 		return
 	}
 	var req struct {
 		Path string `json:"path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.validator.ValidateFile(req.Path); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	resolved, err := s.resolveAllowedPath(req.Path)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"valid": true})
+	export, raw, err := s.importer.Import(resolved)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.validator.ValidateBytes(raw); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	importID, err := s.store.Import(r.Context(), auth.UserIDFromContext(r.Context()), resolved, export, raw)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, "imported", map[string]any{
+		"import_id":        importID,
+		"msglayer_version": export.Version,
+	})
+}
+
+func (s *Server) handleValidateUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	raw, _, err := readUpload(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.validator.ValidateBytes(raw); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "valid", map[string]any{"valid": true})
+}
+
+func (s *Server) handleValidatePath(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := s.requireAdmin(r.Context()); err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	resolved, err := s.resolveAllowedPath(req.Path)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if err := s.validator.ValidateFile(resolved); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "valid", map[string]any{"valid": true})
+}
+
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	imports, err := s.store.ListImports(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	identities, err := s.service.Identities(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	events, err := s.service.Timeline(r.Context(), buildSearchParams(r, userID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	totalEvents := 0
+	for _, item := range imports {
+		totalEvents += item.EventCount
+	}
+	lastActivity := ""
+	if len(events) > 0 {
+		lastActivity = events[0].Timestamp
+	}
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"importCount":   len(imports),
+		"identityCount": len(identities),
+		"eventCount":    totalEvents,
+		"lastActivity":  lastActivity,
+		"recentImports": takeImports(imports, 5),
+		"recentEvents":  takeEvents(events, 8),
+	})
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	items, err := s.service.Events(r.Context(), buildSearchParams(r))
+	items, err := s.service.Events(r.Context(), buildSearchParams(r, auth.UserIDFromContext(r.Context())))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, "ok", items)
 }
 
 func (s *Server) handleEvent(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/api/events/"):]
-	item, err := s.service.Event(r.Context(), id)
+	id := strings.TrimPrefix(r.URL.Path, "/api/events/")
+	item, err := s.service.Event(r.Context(), auth.UserIDFromContext(r.Context()), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, item)
+	writeJSON(w, http.StatusOK, "ok", item)
 }
 
 func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
-	items, err := s.service.Timeline(r.Context(), buildSearchParams(r))
+	items, err := s.service.Timeline(r.Context(), buildSearchParams(r, auth.UserIDFromContext(r.Context())))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, "ok", items)
 }
 
 func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
-	items, err := s.service.Identities(r.Context())
+	items, err := s.service.Identities(r.Context(), auth.UserIDFromContext(r.Context()))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, "ok", items)
 }
 
 func (s *Server) handleIdentity(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/api/identities/"):]
-	item, err := s.service.Identity(r.Context(), id)
+	id := strings.TrimPrefix(r.URL.Path, "/api/identities/")
+	item, err := s.service.Identity(r.Context(), auth.UserIDFromContext(r.Context()), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, item)
+	writeJSON(w, http.StatusOK, "ok", item)
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
-	items, err := s.service.Search(r.Context(), buildSearchParams(r))
+	items, err := s.service.Search(r.Context(), buildSearchParams(r, auth.UserIDFromContext(r.Context())))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, "ok", items)
 }
 
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/api/threads/"):]
-	items, err := s.service.Thread(r.Context(), id)
+	id := strings.TrimPrefix(r.URL.Path, "/api/threads/")
+	items, err := s.service.Thread(r.Context(), auth.UserIDFromContext(r.Context()), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, "ok", items)
 }
 
-func buildSearchParams(r *http.Request) msglayer.SearchParams {
+func (s *Server) requireAdmin(ctx context.Context) error {
+	user, err := s.auth.UserInfo(ctx, auth.UserIDFromContext(ctx))
+	if err != nil {
+		return err
+	}
+	for _, role := range user.Roles {
+		if role == "R_SUPER" || role == "R_ADMIN" {
+			return nil
+		}
+	}
+	return fmt.Errorf("admin privileges required")
+}
+
+func (s *Server) resolveAllowedPath(input string) (string, error) {
+	if strings.TrimSpace(input) == "" {
+		return "", fmt.Errorf("path is required")
+	}
+	resolved, err := filepath.Abs(input)
+	if err != nil {
+		return "", err
+	}
+	for _, root := range s.cfg.AllowedImportDir {
+		if strings.HasPrefix(resolved, root+string(os.PathSeparator)) || resolved == root {
+			return resolved, nil
+		}
+	}
+	return "", fmt.Errorf("path is outside configured import roots")
+}
+
+func buildSearchParams(r *http.Request, userID string) msglayer.SearchParams {
 	q := r.URL.Query()
-	return msglayer.SearchParams{
+	params := msglayer.SearchParams{
+		UserID:      userID,
 		Keyword:     q.Get("q"),
 		ContactID:   q.Get("contact"),
 		Type:        q.Get("type"),
@@ -169,12 +458,80 @@ func buildSearchParams(r *http.Request) msglayer.SearchParams {
 		To:          q.Get("to"),
 		Limit:       100,
 	}
+	if limit := q.Get("limit"); limit != "" {
+		fmt.Sscanf(limit, "%d", &params.Limit)
+	}
+	return params
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload any) {
+func readUpload(r *http.Request) ([]byte, string, error) {
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			return nil, "", err
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			return nil, "", err
+		}
+		defer file.Close()
+		data, err := io.ReadAll(file)
+		return data, header.Filename, err
+	}
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, "upload.json", nil
+}
+
+func writeJSON(w http.ResponseWriter, status int, msg string, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": status,
+		"msg":  msg,
+		"data": data,
+	})
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, msg, nil)
+}
+
+func setRefreshCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   false,
+	})
+}
+
+func clearRefreshCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+}
+
+func takeImports(items []storage.ImportSummary, n int) []storage.ImportSummary {
+	if len(items) <= n {
+		return items
+	}
+	return items[:n]
+}
+
+func takeEvents(items []msglayer.TimelineItem, n int) []msglayer.TimelineItem {
+	if len(items) <= n {
+		return items
+	}
+	return items[:n]
 }
 
 func Shutdown(ctx context.Context, srv *http.Server) error {

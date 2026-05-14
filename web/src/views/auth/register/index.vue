@@ -26,6 +26,14 @@
               />
             </ElFormItem>
 
+            <ElFormItem prop="email">
+              <ElInput
+                class="custom-height"
+                v-model.trim="formData.email"
+                :placeholder="$t('register.placeholder.email')"
+              />
+            </ElFormItem>
+
             <ElFormItem prop="password">
               <ElInput
                 class="custom-height"
@@ -86,6 +94,8 @@
 </template>
 
 <script setup lang="ts">
+  import { fetchRegister } from '@/api/auth'
+  import { useUserStore } from '@/store/modules/user'
   import { useI18n } from 'vue-i18n'
   import type { FormInstance, FormRules } from 'element-plus'
 
@@ -93,6 +103,7 @@
 
   interface RegisterForm {
     username: string
+    email: string
     password: string
     confirmPassword: string
     agreement: boolean
@@ -101,10 +112,9 @@
   const USERNAME_MIN_LENGTH = 3
   const USERNAME_MAX_LENGTH = 20
   const PASSWORD_MIN_LENGTH = 6
-  const REDIRECT_DELAY = 1000
-
   const { t, locale } = useI18n()
   const router = useRouter()
+  const userStore = useUserStore()
   const formRef = ref<FormInstance>()
 
   const loading = ref(false)
@@ -117,6 +127,7 @@
 
   const formData = reactive<RegisterForm>({
     username: '',
+    email: '',
     password: '',
     confirmPassword: '',
     agreement: false
@@ -183,6 +194,7 @@
         trigger: 'blur'
       }
     ],
+    email: [{ required: true, message: t('register.placeholder.email'), trigger: 'blur' }],
     password: [
       { required: true, validator: validatePassword, trigger: 'blur' },
       { min: PASSWORD_MIN_LENGTH, message: t('register.rule.passwordLength'), trigger: 'blur' }
@@ -202,36 +214,22 @@
       await formRef.value.validate()
       loading.value = true
 
-      // TODO: 替换为真实 API 调用
-      // const params = {
-      //   username: formData.username,
-      //   password: formData.password
-      // }
-      // const res = await AuthService.register(params)
-      // if (res.code === ApiStatus.success) {
-      //   ElMessage.success('注册成功')
-      //   toLogin()
-      // }
-
-      // 模拟注册请求
-      setTimeout(() => {
-        loading.value = false
-        ElMessage.success('注册成功')
-        toLogin()
-      }, REDIRECT_DELAY)
+      const { token, refreshToken, user } = await fetchRegister({
+        userName: formData.username,
+        email: formData.email,
+        password: formData.password
+      })
+      userStore.setToken(token, refreshToken)
+      userStore.setLoginStatus(true)
+      if (user) {
+        userStore.setUserInfo(user)
+      }
+      ElMessage.success('注册成功')
+      router.push('/')
     } catch (error) {
       console.error('表单验证失败:', error)
       loading.value = false
     }
-  }
-
-  /**
-   * 跳转到登录页面
-   */
-  const toLogin = () => {
-    setTimeout(() => {
-      router.push({ name: 'Login' })
-    }, REDIRECT_DELAY)
   }
 </script>
 

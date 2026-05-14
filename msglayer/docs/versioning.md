@@ -18,3 +18,8 @@
 - Android export switches to `MsgLayer`
 - Go backend import/validation targets `MsgLayer`
 - legacy backup JSON remains restore-compatible only through bridge converters
+
+## Relation Type Status In v0.1
+
+- Active in current code paths: `same_thread`, `references_identity`
+- Reserved for future producers/consumers: `reply_to`, `derived_from`

@@ -2,6 +2,8 @@ package imken.messagevault.mobile.data.backup
 
 import android.content.Context
 import com.google.gson.Gson
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import imken.messagevault.mobile.model.BackupData
 import imken.messagevault.sdk.backup.msglayer.MsgLayerSerializer
@@ -41,7 +43,11 @@ class AndroidBackupFileReader(
 
             Timber.d("[Mobile] DEBUG [Restore] Backup file content analysis: hasCallLogs=$containsCallLogs, hasMessages=$containsMessages, hasContacts=$containsContacts")
 
-            if (fileContent.contains("\"version\"") && fileContent.contains("msglayer/v0.1")) {
+            val parsedRoot = runCatching {
+                JsonParser.parseString(fileContent).asJsonObject
+            }.getOrNull()
+
+            if (parsedRoot?.get("version")?.asString == imken.messagevault.sdk.backup.msglayer.model.MSG_LAYER_VERSION) {
                 val msgLayer = msgLayerGson.fromJson(fileContent, MsgLayerRootExport::class.java)
                     ?: return@withContext null
                 return@withContext msgLayer.toBackupReadData()
@@ -182,7 +188,8 @@ class AndroidBackupFileReader(
 
     private fun String.toEpochMillis(): Long = try {
         java.time.OffsetDateTime.parse(this).toInstant().toEpochMilli()
-    } catch (_: Exception) {
-        System.currentTimeMillis()
+    } catch (exception: Exception) {
+        Timber.w(exception, "[Mobile] WARN [Restore] Invalid RFC3339 timestamp: %s", this)
+        0L
     }
 }

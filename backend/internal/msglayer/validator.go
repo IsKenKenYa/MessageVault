@@ -19,8 +19,8 @@ func (v *Validator) ValidateBytes(data []byte) error {
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return err
 	}
-	if payload.Version != "msglayer/v0.1" {
-		return fmt.Errorf("schema validation failed: version must be msglayer/v0.1")
+	if payload.Version != Version {
+		return fmt.Errorf("schema validation failed: version must be %s", Version)
 	}
 	if payload.ExportedAt == "" {
 		return fmt.Errorf("schema validation failed: exported_at is required")
@@ -29,8 +29,11 @@ func (v *Validator) ValidateBytes(data []byte) error {
 		return fmt.Errorf("schema validation failed: source.platform, source.device_id, and source.app_version are required")
 	}
 	for _, identity := range payload.Identities {
-		if identity.ID == "" || identity.Type == "" {
-			return fmt.Errorf("schema validation failed: identity id/type required")
+		if identity.ID == "" || identity.Type == "" || identity.DisplayName == "" {
+			return fmt.Errorf("schema validation failed: identity id/type/display_name required")
+		}
+		if identity.Phones == nil || identity.Emails == nil || identity.Labels == nil {
+			return fmt.Errorf("schema validation failed: identity phones/emails/labels must be present")
 		}
 		switch identity.Type {
 		case "person", "device", "account":
@@ -41,6 +44,14 @@ func (v *Validator) ValidateBytes(data []byte) error {
 	for _, event := range payload.Events {
 		if event.ID == "" || event.Timestamp == "" || event.Type == "" {
 			return fmt.Errorf("schema validation failed: event id/type/timestamp required")
+		}
+		if len(event.Participants) == 0 {
+			return fmt.Errorf("schema validation failed: participants must contain at least one item")
+		}
+		for _, participant := range event.Participants {
+			if participant == "" {
+				return fmt.Errorf("schema validation failed: participant ids must be non-empty")
+			}
 		}
 		switch event.Type {
 		case "sms":
@@ -58,6 +69,9 @@ func (v *Validator) ValidateBytes(data []byte) error {
 				return fmt.Errorf("schema validation failed: call content.duration_sec required")
 			}
 		case "voice":
+			if event.Direction != "inbound" && event.Direction != "outbound" {
+				return fmt.Errorf("schema validation failed: voice direction invalid")
+			}
 			if _, ok := event.Content["file"]; !ok {
 				return fmt.Errorf("schema validation failed: voice content.file required")
 			}
@@ -71,7 +85,15 @@ func (v *Validator) ValidateBytes(data []byte) error {
 		default:
 			return fmt.Errorf("schema validation failed: unsupported event type %q", event.Type)
 		}
+		for _, relation := range event.Relations {
+			switch relation.Type {
+			case "same_thread", "reply_to", "derived_from", "references_identity":
+			default:
+				return fmt.Errorf("schema validation failed: unsupported relation type %q", relation.Type)
+			}
+		}
 	}
+	// TODO: additionalProperties parity still relies on the JSON Schema files until a full schema engine is introduced.
 	return nil
 }
 

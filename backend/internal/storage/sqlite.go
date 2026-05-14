@@ -1,5 +1,5 @@
 package storage
 
 func NewSQLiteProvider(dsn string) (Provider, error) {
-	return newSQLStore(dsn, "sqlite"), nil
+	return newFileStore(dsn, "filestore/sqlite-adapter"), nil
 }
