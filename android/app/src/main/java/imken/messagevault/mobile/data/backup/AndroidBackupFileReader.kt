@@ -4,6 +4,9 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import imken.messagevault.mobile.model.BackupData
+import imken.messagevault.sdk.backup.msglayer.MsgLayerSerializer
+import imken.messagevault.sdk.backup.msglayer.model.MsgLayerIdentity
+import imken.messagevault.sdk.backup.msglayer.model.MsgLayerRootExport
 import imken.messagevault.sdk.backup.model.BackupReadData
 import imken.messagevault.sdk.backup.model.CallLogData
 import imken.messagevault.sdk.backup.model.ContactData
@@ -14,12 +17,14 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.FileReader
+import kotlin.math.absoluteValue
 
 class AndroidBackupFileReader(
     private val context: Context
 ) : BackupFileReader {
 
     private val gson = Gson()
+    private val msgLayerGson = MsgLayerSerializer().gson()
 
     override suspend fun read(filePath: String): BackupReadData? = withContext(Dispatchers.IO) {
         try {
@@ -29,20 +34,23 @@ class AndroidBackupFileReader(
                 return@withContext null
             }
 
+            val fileContent = file.readText()
+            val containsCallLogs = fileContent.contains("\"callLogs\"") || fileContent.contains("\"call_logs\"")
+            val containsMessages = fileContent.contains("\"messages\"") || fileContent.contains("\"sms\"")
+            val containsContacts = fileContent.contains("\"contacts\"")
+
+            Timber.d("[Mobile] DEBUG [Restore] Backup file content analysis: hasCallLogs=$containsCallLogs, hasMessages=$containsMessages, hasContacts=$containsContacts")
+
+            if (fileContent.contains("\"version\"") && fileContent.contains("msglayer/v0.1")) {
+                val msgLayer = msgLayerGson.fromJson(fileContent, MsgLayerRootExport::class.java)
+                    ?: return@withContext null
+                return@withContext msgLayer.toBackupReadData()
+            }
+
             FileReader(file).use { reader ->
-                val fileContent = file.readText()
-                val containsCallLogs = fileContent.contains("\"callLogs\"") || fileContent.contains("\"call_logs\"")
-                val containsMessages = fileContent.contains("\"messages\"") || fileContent.contains("\"sms\"")
-                val containsContacts = fileContent.contains("\"contacts\"")
-
-                Timber.d("[Mobile] DEBUG [Restore] Backup file content analysis: hasCallLogs=$containsCallLogs, hasMessages=$containsMessages, hasContacts=$containsContacts")
-
                 val typeToken = object : TypeToken<BackupData>() {}.type
                 val backupData = gson.fromJson<BackupData>(reader, typeToken)
-                if (backupData == null) {
-                    Timber.e("[Mobile] ERROR [Restore] Parsed backup file returned null: $filePath")
-                    return@withContext null
-                }
+                    ?: return@withContext null
 
                 val messagesCount = backupData.messages?.size ?: 0
                 val callLogsCount = backupData.callLogs?.size ?: 0
@@ -99,5 +107,82 @@ class AndroidBackupFileReader(
             Timber.e(e, "[Mobile] ERROR [Restore] Failed to parse backup file: $filePath, ${e.message}")
             null
         }
+    }
+
+    private fun MsgLayerRootExport.toBackupReadData(): BackupReadData {
+        val identitiesById = identities.associateBy { it.id }
+        val messages = events.filter { it.type == "sms" }.mapNotNull { event ->
+            val address = event.counterpartyAddress(identitiesById)
+            val threadId = event.relations.firstOrNull { it.type == "same_thread" }
+                ?.target
+                ?.removePrefix("thread_")
+                ?.toLongOrNull()
+                ?: 0L
+            SmsData(
+                id = event.id.removePrefix("sms_").toLongOrNull() ?: event.id.hashCode().toLong().absoluteValue,
+                address = address,
+                body = event.content["text"] as? String ?: "",
+                date = event.timestamp.toEpochMillis(),
+                type = if (event.direction == "outbound") 2 else 1,
+                readState = if ((event.meta["read"] as? Boolean) == true) 1 else 0,
+                messageStatus = (event.meta["status"] as? Number)?.toInt() ?: 0,
+                threadId = threadId
+            )
+        }
+        val calls = events.filter { it.type == "call" }.mapNotNull { event ->
+            val address = event.counterpartyAddress(identitiesById)
+            CallLogData(
+                id = event.id.removePrefix("call_").toLongOrNull() ?: event.id.hashCode().toLong().absoluteValue,
+                number = address,
+                type = when (event.content["call_type"] as? String ?: "unknown") {
+                    "outgoing" -> 2
+                    "incoming" -> 3
+                    "rejected" -> 5
+                    "voicemail" -> 4
+                    else -> 1
+                },
+                date = event.timestamp.toEpochMillis(),
+                duration = (event.content["duration_sec"] as? Number)?.toInt() ?: 0,
+                contact = event.counterpartyName(identitiesById)
+            )
+        }
+        val contacts = identities
+            .filter { it.type == "person" }
+            .map { identity ->
+                ContactData(
+                    id = identity.id.hashCode().toLong().absoluteValue,
+                    name = identity.displayName,
+                    phoneNumbers = identity.phones,
+                    emails = identity.emails
+                )
+            }
+        return BackupReadData(
+            messages = messages,
+            callLogs = calls,
+            contacts = contacts,
+            timestamp = exportedAt.toEpochMillis(),
+            deviceInfo = source.deviceId
+        )
+    }
+
+    private fun imken.messagevault.sdk.backup.msglayer.model.MsgLayerEvent.counterpartyAddress(
+        identitiesById: Map<String, MsgLayerIdentity>
+    ): String {
+        val identityId = participants.firstOrNull { !it.startsWith("self/") } ?: return ""
+        val identity = identitiesById[identityId]
+        return identity?.phones?.firstOrNull() ?: identity?.displayName ?: identityId
+    }
+
+    private fun imken.messagevault.sdk.backup.msglayer.model.MsgLayerEvent.counterpartyName(
+        identitiesById: Map<String, MsgLayerIdentity>
+    ): String? {
+        val identityId = participants.firstOrNull { !it.startsWith("self/") } ?: return null
+        return identitiesById[identityId]?.displayName
+    }
+
+    private fun String.toEpochMillis(): Long = try {
+        java.time.OffsetDateTime.parse(this).toInstant().toEpochMilli()
+    } catch (_: Exception) {
+        System.currentTimeMillis()
     }
 }

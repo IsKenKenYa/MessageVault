@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "content.contact_snapshot.schema.json",
+  "title": "MsgLayer Contact Snapshot Content",
+  "type": "object",
+  "required": [
+    "identity_id",
+    "snapshot"
+  ],
+  "properties": {
+    "identity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot": {
+      "$ref": "identity.schema.json"
+    }
+  },
+  "additionalProperties": false
+}

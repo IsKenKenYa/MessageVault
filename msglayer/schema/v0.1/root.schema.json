@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "root.schema.json",
+  "title": "MsgLayer Root Export",
+  "type": "object",
+  "required": [
+    "version",
+    "exported_at",
+    "source",
+    "identities",
+    "events"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "msglayer/v0.1"
+    },
+    "exported_at": {
+      "$ref": "common.schema.json#/definitions/timestamp"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "platform",
+        "device_id",
+        "app_version"
+      ],
+      "properties": {
+        "platform": {
+          "type": "string"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "app_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "identities": {
+      "type": "array",
+      "items": {
+        "$ref": "identity.schema.json"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "event.schema.json"
+      }
+    },
+    "indexes": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "identity.schema.json",
+  "title": "MsgLayer Identity",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "display_name",
+    "phones",
+    "emails",
+    "labels",
+    "meta"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/definitions/id"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "person",
+        "device",
+        "account"
+      ]
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "phones": {
+      "$ref": "common.schema.json#/definitions/stringArray"
+    },
+    "emails": {
+      "$ref": "common.schema.json#/definitions/stringArray"
+    },
+    "avatar": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "labels": {
+      "$ref": "common.schema.json#/definitions/stringArray"
+    },
+    "meta": {
+      "$ref": "common.schema.json#/definitions/meta"
+    }
+  },
+  "additionalProperties": false
+}

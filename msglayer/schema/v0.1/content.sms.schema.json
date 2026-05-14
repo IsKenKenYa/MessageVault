@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "content.sms.schema.json",
+  "title": "MsgLayer SMS Content",
+  "type": "object",
+  "required": [
+    "text",
+    "attachments"
+  ],
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

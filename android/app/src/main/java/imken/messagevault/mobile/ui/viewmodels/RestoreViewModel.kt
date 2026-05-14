@@ -7,8 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import imken.messagevault.mobile.api.ApiClient
 import imken.messagevault.mobile.config.Config
 import imken.messagevault.mobile.data.backup.AndroidBackupFileReader
@@ -20,6 +18,10 @@ import imken.messagevault.mobile.models.BackupFile
 import imken.messagevault.mobile.models.RestoreState
 import imken.messagevault.sdk.backup.RestoreManager
 import imken.messagevault.sdk.backup.model.BackupData
+import imken.messagevault.sdk.backup.model.BackupReadData
+import imken.messagevault.sdk.backup.model.CallLog
+import imken.messagevault.sdk.backup.model.Contact
+import imken.messagevault.sdk.backup.model.Message
 import imken.messagevault.sdk.backup.model.RestoreOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +31,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
-import java.io.FileReader
 import java.util.Date
 
 class RestoreViewModel(
@@ -39,7 +40,7 @@ class RestoreViewModel(
     private val apiClient: ApiClient
 ) : ViewModel() {
 
-    private val gson = Gson()
+    private val backupFileReader = AndroidBackupFileReader(context)
 
     private val _backupFiles = MutableStateFlow<List<BackupFile>>(emptyList())
     val backupFiles: StateFlow<List<BackupFile>> = _backupFiles.asStateFlow()
@@ -286,16 +287,14 @@ class RestoreViewModel(
                         context.contentResolver, android.provider.Settings.Secure.ANDROID_ID
                     ) ?: "unknown"
 
-                    val backupData = FileReader(file).use { reader ->
-                        try { gson.fromJson(reader, BackupData::class.java) } catch (_: Exception) { null }
-                    }
+                    val backupData = backupFileReader.read(file.absolutePath)
 
                     BackupFile(
                         filePath = file.absolutePath,
                         fileName = file.name,
                         fileSize = file.length(),
                         creationDate = Date(file.lastModified()),
-                        deviceName = deviceId,
+                        deviceName = backupData?.deviceInfo ?: deviceId,
                         smsCount = backupData?.messages?.size ?: 0,
                         callLogsCount = backupData?.callLogs?.size ?: 0,
                         version = imken.messagevault.mobile.BuildConfig.VERSION_NAME
@@ -309,27 +308,50 @@ class RestoreViewModel(
     }
 
     private suspend fun parseBackupFile(backupFile: BackupFile): BackupData? = withContext(Dispatchers.IO) {
-        try {
-            FileReader(File(backupFile.filePath)).use { reader ->
-                val typeToken = object : TypeToken<BackupData>() {}.type
-                gson.fromJson<BackupData>(reader, typeToken)
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "[Mobile] ERROR [Restore] Failed to parse backup file: ${backupFile.fileName}")
-            null
-        }
+        backupFileReader.read(backupFile.filePath)?.toLegacyBackupData()
     }
 
     private fun validateBackupFile(file: File): Boolean {
         if (!file.exists() || !file.isFile || !file.canRead()) return false
-        return try {
-            FileReader(file).use { reader ->
-                val typeToken = object : TypeToken<BackupData>() {}.type
-                gson.fromJson<BackupData>(reader, typeToken) != null
-            }
-        } catch (_: Exception) {
-            false
-        }
+        return runCatching { kotlinx.coroutines.runBlocking { backupFileReader.read(file.absolutePath) != null } }
+            .getOrDefault(false)
+    }
+
+    private fun BackupReadData.toLegacyBackupData(): BackupData {
+        return BackupData(
+            messages = messages.map { message ->
+                Message(
+                    id = message.id,
+                    address = message.address,
+                    body = message.body,
+                    date = message.date,
+                    type = message.type,
+                    readState = message.readState,
+                    messageStatus = message.messageStatus,
+                    threadId = message.threadId
+                )
+            },
+            callLogs = callLogs.map { callLog ->
+                CallLog(
+                    id = callLog.id,
+                    number = callLog.number,
+                    type = callLog.type,
+                    date = callLog.date,
+                    duration = callLog.duration,
+                    contact = callLog.contact
+                )
+            },
+            contacts = contacts.map { contact ->
+                Contact(
+                    id = contact.id,
+                    name = contact.name,
+                    phoneNumbers = contact.phoneNumbers.toMutableList(),
+                    emails = contact.emails
+                )
+            },
+            timestamp = timestamp,
+            deviceInfo = deviceInfo
+        )
     }
     
     fun setPermissionsGranted(granted: Boolean) {

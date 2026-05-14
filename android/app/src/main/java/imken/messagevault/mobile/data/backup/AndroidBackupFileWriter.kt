@@ -2,9 +2,10 @@ package imken.messagevault.mobile.data.backup
 
 import android.content.Context
 import android.os.Build
-import imken.messagevault.sdk.backup.model.BackupData
 import imken.messagevault.sdk.backup.model.BackupResult
-import imken.messagevault.sdk.backup.serializer.BackupSerializer
+import imken.messagevault.sdk.backup.model.BackupWriteStats
+import imken.messagevault.sdk.backup.msglayer.MsgLayerSerializer
+import imken.messagevault.sdk.backup.msglayer.model.MsgLayerRootExport
 import imken.messagevault.sdk.backup.writer.BackupFileWriter
 import timber.log.Timber
 import java.io.File
@@ -14,9 +15,9 @@ import java.util.Locale
 
 class AndroidBackupFileWriter(private val context: Context) : BackupFileWriter {
 
-    private val serializer = BackupSerializer()
+    private val serializer = MsgLayerSerializer()
 
-    override suspend fun writeBackup(data: BackupData, filePath: String): BackupResult {
+    override suspend fun writeBackup(export: MsgLayerRootExport, stats: BackupWriteStats): BackupResult {
         try {
             val backupDir = File(context.getExternalFilesDir(null), "backups")
             if (!backupDir.exists()) {
@@ -26,18 +27,11 @@ class AndroidBackupFileWriter(private val context: Context) : BackupFileWriter {
             val fileName = generateUserFriendlyFileName()
             val backupFile = File(backupDir, fileName)
 
-            Timber.d("[Mobile] DEBUG [Backup] 数据准备情况: 短信=${data.messages?.size ?: 0}, 通话记录=${data.callLogs?.size ?: 0}, 联系人=${data.contacts?.size ?: 0}, 设备信息=${data.deviceInfo}")
+            Timber.d(
+                "[Mobile] DEBUG [Backup] MsgLayer数据准备情况: 短信=${stats.smsCount}, 通话记录=${stats.callLogCount}, 联系人=${stats.contactCount}, 版本=${export.version}"
+            )
 
-            val jsonString = serializer.serializeWithSizeLimit(data)
-                ?: return BackupResult(
-                    success = false,
-                    timestamp = System.currentTimeMillis(),
-                    appVersion = "",
-                    deviceId = "",
-                    smsCount = data.messages?.size ?: 0,
-                    callLogCount = data.callLogs?.size ?: 0,
-                    errorMessage = "创建备份文件失败"
-                )
+            val jsonString = serializer.toJson(export)
 
             try {
                 backupFile.writeText(jsonString)
@@ -70,10 +64,10 @@ class AndroidBackupFileWriter(private val context: Context) : BackupFileWriter {
             return BackupResult(
                 success = true,
                 timestamp = System.currentTimeMillis(),
-                appVersion = "",
-                deviceId = "",
-                smsCount = data.messages?.size ?: 0,
-                callLogCount = data.callLogs?.size ?: 0,
+                appVersion = export.source.appVersion,
+                deviceId = export.source.deviceId,
+                smsCount = stats.smsCount,
+                callLogCount = stats.callLogCount,
                 fileName = backupFile.name,
                 filePath = backupFile.absolutePath
             )
@@ -94,6 +88,6 @@ class AndroidBackupFileWriter(private val context: Context) : BackupFileWriter {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault())
         val timestamp = dateFormat.format(Date())
         val device = deviceName ?: Build.MODEL.replace(" ", "_")
-        return "MessageVault_${device}_${timestamp}.json"
+        return "msglayer-v0.1_${device}_${timestamp}.json"
     }
 }

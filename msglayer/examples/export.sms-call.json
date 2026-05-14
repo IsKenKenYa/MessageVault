@@ -1,0 +1,134 @@
+{
+  "version": "msglayer/v0.1",
+  "exported_at": "2026-01-01T12:00:00Z",
+  "source": {
+    "platform": "android",
+    "device_id": "device_001",
+    "app_version": "0.1.4"
+  },
+  "identities": [
+    {
+      "id": "self/device_001",
+      "type": "device",
+      "display_name": "Pixel Demo",
+      "phones": [],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "self"
+      ],
+      "meta": {
+        "source": "system"
+      }
+    },
+    {
+      "id": "person_zhangsan",
+      "type": "person",
+      "display_name": "张三",
+      "phones": [
+        "+8613800000000"
+      ],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "contact"
+      ],
+      "meta": {
+        "source": "contacts"
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "contact_snapshot_person_zhangsan",
+      "type": "contact_snapshot",
+      "timestamp": "2026-01-01T12:00:00Z",
+      "direction": "system",
+      "participants": [
+        "person_zhangsan"
+      ],
+      "content": {
+        "identity_id": "person_zhangsan",
+        "snapshot": {
+          "id": "person_zhangsan",
+          "type": "person",
+          "display_name": "张三",
+          "phones": [
+            "+8613800000000"
+          ],
+          "emails": [],
+          "avatar": null,
+          "labels": [
+            "contact"
+          ],
+          "meta": {
+            "source": "contacts"
+          }
+        }
+      },
+      "meta": {
+        "source": "contacts"
+      },
+      "relations": [
+        {
+          "type": "references_identity",
+          "target": "person_zhangsan"
+        }
+      ]
+    },
+    {
+      "id": "sms_101",
+      "type": "sms",
+      "timestamp": "2025-12-01T10:00:00Z",
+      "direction": "inbound",
+      "participants": [
+        "self/device_001",
+        "person_zhangsan"
+      ],
+      "content": {
+        "text": "你好，验证码是123456",
+        "attachments": []
+      },
+      "meta": {
+        "read": true,
+        "status": 0
+      },
+      "relations": [
+        {
+          "type": "same_thread",
+          "target": "thread_42"
+        }
+      ]
+    },
+    {
+      "id": "call_202",
+      "type": "call",
+      "timestamp": "2025-12-01T10:05:00Z",
+      "direction": "inbound",
+      "participants": [
+        "self/device_001",
+        "person_zhangsan"
+      ],
+      "content": {
+        "duration_sec": 120,
+        "call_type": "incoming",
+        "recording": null
+      },
+      "meta": {
+        "source": "call_log"
+      },
+      "relations": [
+        {
+          "type": "references_identity",
+          "target": "person_zhangsan"
+        }
+      ]
+    }
+  ],
+  "indexes": {
+    "timeline": [
+      "sms_101",
+      "call_202"
+    ]
+  }
+}

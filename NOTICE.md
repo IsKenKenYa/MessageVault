@@ -1,4 +1,4 @@
-# MessageVault 项目规范
+# Commory 项目规范
 
 ## 🏗️ 编码标准
 
@@ -103,11 +103,18 @@ sdk/storage ✗→ sdk/backup, sdk/auth, app
 - API 变更必须更新文档
 - 用户可见的变更需更新用户手册
 
+## 📎 外部参考源码
+
+- `references/` 目录用于存放外部参考源码或设计参考子模块
+- `references/` 下的内容默认视为只读，不作为当前项目功能实现目录
+- 外部参考源码不参与当前项目构建、发布和主许可证主体
+- 如需吸收参考实现，请在本项目自己的模块中重写，不直接在参考镜像目录上开发
+
 ## 📦 Monorepo 结构
 
 ```
-MessageVault/
-├── android/                    # MessageVault-Mobile (Kotlin/Android)
+Commory/
+├── android/                    # Android ingestion layer (Kotlin/Android)
 │   ├── sdk/
 │   │   ├── backup/             # 纯Kotlin备份/恢复SDK
 │   │   ├── auth/               # 纯Kotlin认证组件
@@ -118,7 +125,8 @@ MessageVault/
 │       ├── third-party-auth.md
 │       ├── ai-agent-integration.md
 │       └── backend-microservices.md
-├── previewer/                  # SMS-Previewer (Vue 3/Vite)
+├── previewer/                  # Viewer layer (Vue 3/Vite)
+├── references/                 # 外部只读参考源码
 ├── .trae/                      # 开发工具配置
 ├── LICENSE                     # GPL v3.0
 ├── NOTICE.md                   # 项目规范

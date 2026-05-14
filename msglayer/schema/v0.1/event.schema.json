@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event.schema.json",
+  "title": "MsgLayer Event",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "timestamp",
+    "direction",
+    "participants",
+    "content",
+    "meta",
+    "relations"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/definitions/id"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "sms",
+        "call",
+        "voice",
+        "contact_snapshot"
+      ]
+    },
+    "timestamp": {
+      "$ref": "common.schema.json#/definitions/timestamp"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "inbound",
+        "outbound",
+        "missed",
+        "system"
+      ]
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "content": {
+      "type": "object"
+    },
+    "meta": {
+      "$ref": "common.schema.json#/definitions/meta"
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "$ref": "relation.schema.json"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sms"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "inbound",
+              "outbound"
+            ]
+          },
+          "content": {
+            "$ref": "content.sms.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "call"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "inbound",
+              "outbound",
+              "missed"
+            ]
+          },
+          "content": {
+            "$ref": "content.call.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "voice"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "inbound",
+              "outbound"
+            ]
+          },
+          "content": {
+            "$ref": "content.voice.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "contact_snapshot"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "direction": {
+            "const": "system"
+          },
+          "content": {
+            "$ref": "content.contact_snapshot.schema.json"
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

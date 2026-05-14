@@ -1,0 +1,27 @@
+{
+  "version": "msglayer/v0.1",
+  "exported_at": "2026-01-01T12:00:00Z",
+  "source": {
+    "platform": "android",
+    "device_id": "device_demo",
+    "app_version": "0.1.0"
+  },
+  "identities": [
+    {
+      "id": "self/device_demo",
+      "type": "device",
+      "display_name": "My Android Device",
+      "phones": [],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "self"
+      ],
+      "meta": {
+        "source": "system"
+      }
+    }
+  ],
+  "events": [],
+  "indexes": {}
+}

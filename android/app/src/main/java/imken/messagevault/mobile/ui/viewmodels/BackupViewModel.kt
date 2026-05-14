@@ -2,6 +2,7 @@ package imken.messagevault.mobile.ui.viewmodels
 
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -15,6 +16,7 @@ import imken.messagevault.mobile.data.backup.AndroidContactReader
 import imken.messagevault.mobile.data.backup.AndroidContactWriter
 import imken.messagevault.mobile.data.backup.AndroidSmsReader
 import imken.messagevault.mobile.data.backup.AndroidSmsWriter
+import imken.messagevault.mobile.BuildConfig
 import imken.messagevault.sdk.backup.BackupManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -62,11 +64,17 @@ class BackupViewModel(
         viewModelScope.launch(dispatcher) {
             try {
                 val deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL}"
+                val deviceId = Settings.Secure.getString(
+                    context.contentResolver,
+                    Settings.Secure.ANDROID_ID
+                ) ?: "unknown-device"
                 val result = backupManager.performBackup(
                     hasSmsPermission = true,
                     hasCallLogPermission = true,
                     hasContactsPermission = true,
-                    deviceInfo = deviceInfo
+                    deviceInfo = deviceInfo,
+                    deviceId = deviceId,
+                    appVersion = BuildConfig.VERSION_NAME
                 )
                 if (result.success) {
                     _backupStatus.value = "备份完成: ${result.smsCount} 条短信, ${result.callLogCount} 条通话记录"

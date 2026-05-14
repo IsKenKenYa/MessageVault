@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "content.voice.schema.json",
+  "title": "MsgLayer Voice Content",
+  "type": "object",
+  "required": [
+    "file",
+    "transcript",
+    "summary"
+  ],
+  "properties": {
+    "file": {
+      "type": "string"
+    },
+    "transcript": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

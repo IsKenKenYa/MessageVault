@@ -2,6 +2,11 @@ package imken.messagevault.sdk.backup
 
 import imken.messagevault.sdk.backup.model.BackupData
 import imken.messagevault.sdk.backup.model.BackupResult
+import imken.messagevault.sdk.backup.model.CallLog
+import imken.messagevault.sdk.backup.model.Contact
+import imken.messagevault.sdk.backup.model.Message
+import imken.messagevault.sdk.backup.model.BackupWriteStats
+import imken.messagevault.sdk.backup.msglayer.MsgLayerMapper
 import imken.messagevault.sdk.backup.reader.BackupFileReader
 import imken.messagevault.sdk.backup.reader.CallLogReader
 import imken.messagevault.sdk.backup.reader.ContactReader
@@ -21,14 +26,17 @@ class BackupManager(
     private val smsWriter: SmsWriter,
     private val callLogWriter: CallLogWriter,
     private val contactWriter: ContactWriter,
-    private val serializer: BackupSerializer = BackupSerializer()
+    private val serializer: BackupSerializer = BackupSerializer(),
+    private val msgLayerMapper: MsgLayerMapper = MsgLayerMapper()
 ) {
 
     suspend fun performBackup(
         hasSmsPermission: Boolean,
         hasCallLogPermission: Boolean,
         hasContactsPermission: Boolean,
-        deviceInfo: String = ""
+        deviceInfo: String = "",
+        deviceId: String = "",
+        appVersion: String = ""
     ): BackupResult {
         if (!hasSmsPermission && !hasCallLogPermission && !hasContactsPermission) {
             return BackupResult(
@@ -61,42 +69,100 @@ class BackupManager(
             )
         }
 
-        val backupData = BackupData(
-            messages = messages,
-            callLogs = callLogs,
-            contacts = contacts,
-            timestamp = System.currentTimeMillis(),
-            deviceInfo = deviceInfo
+        val export = msgLayerMapper.toRootExport(
+            messages = messages.orEmpty(),
+            callLogs = callLogs.orEmpty(),
+            contacts = contacts.orEmpty(),
+            deviceInfo = deviceInfo,
+            deviceId = deviceId.ifBlank { "unknown-device" },
+            appVersion = appVersion.ifBlank { "unknown" }
         )
 
-        val json = serializer.serializeWithSizeLimit(backupData)
-            ?: return BackupResult(
-                success = false,
-                timestamp = System.currentTimeMillis(),
-                appVersion = "",
-                deviceId = "",
+        return backupFileWriter.writeBackup(
+            export = export,
+            stats = BackupWriteStats(
                 smsCount = messagesCount,
                 callLogCount = callLogsCount,
-                errorMessage = "创建备份文件失败"
+                contactCount = contactsCount
             )
-
-        return backupFileWriter.writeBackup(backupData, "")
+        )
     }
 
     suspend fun restoreFromFile(filePath: String): BackupData? {
-        return backupFileReader.readBackup(filePath)
+        val backupReadData = backupFileReader.read(filePath) ?: return null
+        return BackupData(
+            messages = backupReadData.messages.map { message ->
+                Message(
+                    id = message.id,
+                    address = message.address,
+                    body = message.body,
+                    date = message.date,
+                    type = message.type,
+                    readState = message.readState,
+                    messageStatus = message.messageStatus,
+                    threadId = message.threadId
+                )
+            },
+            callLogs = backupReadData.callLogs.map { callLog ->
+                CallLog(
+                    id = callLog.id,
+                    number = callLog.number,
+                    type = callLog.type,
+                    date = callLog.date,
+                    duration = callLog.duration,
+                    contact = callLog.contact
+                )
+            },
+            contacts = backupReadData.contacts.map { contact ->
+                Contact(
+                    id = contact.id,
+                    name = contact.name,
+                    phoneNumbers = contact.phoneNumbers.toMutableList(),
+                    emails = contact.emails
+                )
+            },
+            timestamp = backupReadData.timestamp,
+            deviceInfo = backupReadData.deviceInfo
+        )
     }
 
     suspend fun restoreSms(messages: List<imken.messagevault.sdk.backup.model.Message>): Int {
-        return smsWriter.writeSms(messages)
+        return smsWriter.write(messages.map { message ->
+            imken.messagevault.sdk.backup.model.SmsData(
+                id = message.id,
+                address = message.address,
+                body = message.body,
+                date = message.date,
+                type = message.type,
+                readState = message.readState,
+                messageStatus = message.messageStatus,
+                threadId = message.threadId
+            )
+        })
     }
 
     suspend fun restoreCallLogs(callLogs: List<imken.messagevault.sdk.backup.model.CallLog>): Int {
-        return callLogWriter.writeCallLogs(callLogs)
+        return callLogWriter.write(callLogs.map { callLog ->
+            imken.messagevault.sdk.backup.model.CallLogData(
+                id = callLog.id,
+                number = callLog.number,
+                type = callLog.type,
+                date = callLog.date,
+                duration = callLog.duration,
+                contact = callLog.contact
+            )
+        })
     }
 
     suspend fun restoreContacts(contacts: List<imken.messagevault.sdk.backup.model.Contact>): Int {
-        return contactWriter.writeContacts(contacts)
+        return contactWriter.write(contacts.map { contact ->
+            imken.messagevault.sdk.backup.model.ContactData(
+                id = contact.id,
+                name = contact.name,
+                phoneNumbers = contact.phoneNumbers,
+                emails = contact.emails
+            )
+        })
     }
 
     fun getSerializer(): BackupSerializer = serializer

@@ -1,0 +1,181 @@
+{
+  "imports": {
+    "import_1778758632278756000": {
+      "id": "import_1778758632278756000",
+      "schema_version": "msglayer/v0.1",
+      "imported_at": "2026-05-14T11:37:12Z",
+      "source_path": "../msglayer/examples/export.sms-call.json",
+      "raw_json": "{\n  \"version\": \"msglayer/v0.1\",\n  \"exported_at\": \"2026-01-01T12:00:00Z\",\n  \"source\": {\n    \"platform\": \"android\",\n    \"device_id\": \"device_001\",\n    \"app_version\": \"0.1.4\"\n  },\n  \"identities\": [\n    {\n      \"id\": \"self/device_001\",\n      \"type\": \"device\",\n      \"display_name\": \"Pixel Demo\",\n      \"phones\": [],\n      \"emails\": [],\n      \"avatar\": null,\n      \"labels\": [\n        \"self\"\n      ],\n      \"meta\": {\n        \"source\": \"system\"\n      }\n    },\n    {\n      \"id\": \"person_zhangsan\",\n      \"type\": \"person\",\n      \"display_name\": \"张三\",\n      \"phones\": [\n        \"+8613800000000\"\n      ],\n      \"emails\": [],\n      \"avatar\": null,\n      \"labels\": [\n        \"contact\"\n      ],\n      \"meta\": {\n        \"source\": \"contacts\"\n      }\n    }\n  ],\n  \"events\": [\n    {\n      \"id\": \"contact_snapshot_person_zhangsan\",\n      \"type\": \"contact_snapshot\",\n      \"timestamp\": \"2026-01-01T12:00:00Z\",\n      \"direction\": \"system\",\n      \"participants\": [\n        \"person_zhangsan\"\n      ],\n      \"content\": {\n        \"identity_id\": \"person_zhangsan\",\n        \"snapshot\": {\n          \"id\": \"person_zhangsan\",\n          \"type\": \"person\",\n          \"display_name\": \"张三\",\n          \"phones\": [\n            \"+8613800000000\"\n          ],\n          \"emails\": [],\n          \"avatar\": null,\n          \"labels\": [\n            \"contact\"\n          ],\n          \"meta\": {\n            \"source\": \"contacts\"\n          }\n        }\n      },\n      \"meta\": {\n        \"source\": \"contacts\"\n      },\n      \"relations\": [\n        {\n          \"type\": \"references_identity\",\n          \"target\": \"person_zhangsan\"\n        }\n      ]\n    },\n    {\n      \"id\": \"sms_101\",\n      \"type\": \"sms\",\n      \"timestamp\": \"2025-12-01T10:00:00Z\",\n      \"direction\": \"inbound\",\n      \"participants\": [\n        \"self/device_001\",\n        \"person_zhangsan\"\n      ],\n      \"content\": {\n        \"text\": \"你好，验证码是123456\",\n        \"attachments\": []\n      },\n      \"meta\": {\n        \"read\": true,\n        \"status\": 0\n      },\n      \"relations\": [\n        {\n          \"type\": \"same_thread\",\n          \"target\": \"thread_42\"\n        }\n      ]\n    },\n    {\n      \"id\": \"call_202\",\n      \"type\": \"call\",\n      \"timestamp\": \"2025-12-01T10:05:00Z\",\n      \"direction\": \"inbound\",\n      \"participants\": [\n        \"self/device_001\",\n        \"person_zhangsan\"\n      ],\n      \"content\": {\n        \"duration_sec\": 120,\n        \"call_type\": \"incoming\",\n        \"recording\": null\n      },\n      \"meta\": {\n        \"source\": \"call_log\"\n      },\n      \"relations\": [\n        {\n          \"type\": \"references_identity\",\n          \"target\": \"person_zhangsan\"\n        }\n      ]\n    }\n  ],\n  \"indexes\": {\n    \"timeline\": [\n      \"sms_101\",\n      \"call_202\"\n    ]\n  }\n}\n"
+    }
+  },
+  "identities": {
+    "person_zhangsan": {
+      "id": "person_zhangsan",
+      "type": "person",
+      "display_name": "张三",
+      "phones": [
+        "+8613800000000"
+      ],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "contact"
+      ],
+      "meta": {
+        "source": "contacts"
+      }
+    },
+    "self/device_001": {
+      "id": "self/device_001",
+      "type": "device",
+      "display_name": "Pixel Demo",
+      "phones": [],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "self"
+      ],
+      "meta": {
+        "source": "system"
+      }
+    }
+  },
+  "events": {
+    "call_202": {
+      "item": {
+        "event_id": "call_202",
+        "type": "call",
+        "timestamp": "2025-12-01T10:05:00Z",
+        "direction": "inbound",
+        "content_summary": "incoming 120sec",
+        "participants": [
+          "self/device_001",
+          "person_zhangsan"
+        ],
+        "meta": {
+          "source": "call_log"
+        },
+        "schema_version": "msglayer/v0.1"
+      },
+      "raw": {
+        "id": "call_202",
+        "type": "call",
+        "timestamp": "2025-12-01T10:05:00Z",
+        "direction": "inbound",
+        "participants": [
+          "self/device_001",
+          "person_zhangsan"
+        ],
+        "content": {
+          "call_type": "incoming",
+          "duration_sec": 120,
+          "recording": null
+        },
+        "meta": {
+          "source": "call_log"
+        },
+        "relations": [
+          {
+            "type": "references_identity",
+            "target": "person_zhangsan"
+          }
+        ]
+      }
+    },
+    "contact_snapshot_person_zhangsan": {
+      "item": {
+        "event_id": "contact_snapshot_person_zhangsan",
+        "type": "contact_snapshot",
+        "timestamp": "2026-01-01T12:00:00Z",
+        "direction": "system",
+        "content_summary": "person_zhangsan",
+        "participants": [
+          "person_zhangsan"
+        ],
+        "meta": {
+          "source": "contacts"
+        },
+        "schema_version": "msglayer/v0.1"
+      },
+      "raw": {
+        "id": "contact_snapshot_person_zhangsan",
+        "type": "contact_snapshot",
+        "timestamp": "2026-01-01T12:00:00Z",
+        "direction": "system",
+        "participants": [
+          "person_zhangsan"
+        ],
+        "content": {
+          "identity_id": "person_zhangsan",
+          "snapshot": {
+            "avatar": null,
+            "display_name": "张三",
+            "emails": [],
+            "id": "person_zhangsan",
+            "labels": [
+              "contact"
+            ],
+            "meta": {
+              "source": "contacts"
+            },
+            "phones": [
+              "+8613800000000"
+            ],
+            "type": "person"
+          }
+        },
+        "meta": {
+          "source": "contacts"
+        },
+        "relations": [
+          {
+            "type": "references_identity",
+            "target": "person_zhangsan"
+          }
+        ]
+      }
+    },
+    "sms_101": {
+      "item": {
+        "event_id": "sms_101",
+        "type": "sms",
+        "timestamp": "2025-12-01T10:00:00Z",
+        "direction": "inbound",
+        "content_summary": "你好，验证码是123456",
+        "participants": [
+          "self/device_001",
+          "person_zhangsan"
+        ],
+        "meta": {
+          "read": true,
+          "status": 0
+        },
+        "schema_version": "msglayer/v0.1"
+      },
+      "raw": {
+        "id": "sms_101",
+        "type": "sms",
+        "timestamp": "2025-12-01T10:00:00Z",
+        "direction": "inbound",
+        "participants": [
+          "self/device_001",
+          "person_zhangsan"
+        ],
+        "content": {
+          "attachments": [],
+          "text": "你好，验证码是123456"
+        },
+        "meta": {
+          "read": true,
+          "status": 0
+        },
+        "relations": [
+          {
+            "type": "same_thread",
+            "target": "thread_42"
+          }
+        ]
+      }
+    }
+  }
+}

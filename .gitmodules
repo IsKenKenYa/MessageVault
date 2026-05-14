@@ -1,0 +1,4 @@
+[submodule "references/art-design-pro"]
+	path = references/art-design-pro
+	url = https://github.com/Daymychen/art-design-pro.git
+	branch = main

@@ -2,9 +2,11 @@ package imken.messagevault.mobile
 
 import android.Manifest
 import android.content.Context
+import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
+import imken.messagevault.mobile.BuildConfig
 import imken.messagevault.mobile.data.backup.AndroidBackupFileReader
 import imken.messagevault.mobile.data.backup.AndroidBackupFileWriter
 import imken.messagevault.mobile.data.backup.AndroidCallLogReader
@@ -82,7 +84,12 @@ class BackupManagerInstrumentedTest {
             hasSmsPermission = true,
             hasCallLogPermission = true,
             hasContactsPermission = true,
-            deviceInfo = "Test Device"
+            deviceInfo = "Test Device",
+            deviceId = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ANDROID_ID
+            ) ?: "instrumented-device",
+            appVersion = BuildConfig.VERSION_NAME
         )
         
         Timber.i("[Mobile] INFO [Test] 备份结果; Context: success=${result.success}, smsCount=${result.smsCount}, callLogCount=${result.callLogCount}")

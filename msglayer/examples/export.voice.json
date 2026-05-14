@@ -1,0 +1,67 @@
+{
+  "version": "msglayer/v0.1",
+  "exported_at": "2026-01-01T12:00:00Z",
+  "source": {
+    "platform": "android",
+    "device_id": "device_voice",
+    "app_version": "0.1.4"
+  },
+  "identities": [
+    {
+      "id": "self/device_voice",
+      "type": "device",
+      "display_name": "Voice Device",
+      "phones": [],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "self"
+      ],
+      "meta": {
+        "source": "system"
+      }
+    },
+    {
+      "id": "person_lisi",
+      "type": "person",
+      "display_name": "李四",
+      "phones": [
+        "+8613900000000"
+      ],
+      "emails": [],
+      "avatar": null,
+      "labels": [
+        "contact"
+      ],
+      "meta": {
+        "source": "contacts"
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "voice_1",
+      "type": "voice",
+      "timestamp": "2025-12-02T08:30:00Z",
+      "direction": "outbound",
+      "participants": [
+        "self/device_voice",
+        "person_lisi"
+      ],
+      "content": {
+        "file": "file://voice/001.mp3",
+        "transcript": "我们明天见面讨论项目",
+        "summary": "约好明天讨论项目"
+      },
+      "meta": {
+        "source": "voice_recording"
+      },
+      "relations": [
+        {
+          "type": "same_thread",
+          "target": "thread_voice_1"
+        }
+      ]
+    }
+  ]
+}
