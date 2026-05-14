@@ -27,6 +27,14 @@ previewer/dist/
 previewer/.temp/
 previewer/.cache/
 .pnpm-store/
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/*.local
+web/.cursorrules
+web/src/types/import/auto-imports.d.ts
+web/src/types/import/components.d.ts
+web/.auto-import.json
 
 # Coverage
 coverage/
