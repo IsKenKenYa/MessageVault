@@ -1,0 +1,23 @@
+| Method | Path | Auth | Handler |
+|--------|------|------|---------|
+| POST | /api/auth/register | public | handleRegister |
+| POST | /api/auth/login | public | handleLogin |
+| POST | /api/auth/refresh | public | handleRefresh |
+| POST | /api/auth/logout | public | handleLogout |
+| GET | /api/setup | public | handleGetSetup |
+| POST | /api/setup | public | handlePostSetup |
+| GET | /api/user/info | Bearer | handleUserInfo |
+| GET | /api/imports | Bearer | handleImports |
+| POST | /api/imports/upload | Bearer | handleImportUpload |
+| GET | /api/imports/{id}/export | Bearer | handleImportExport |
+| POST | /api/imports/path | Bearer+Admin | handleImportPath |
+| POST | /api/validate/upload | Bearer | handleValidateUpload |
+| POST | /api/validate/path | Bearer+Admin | handleValidatePath |
+| GET | /api/dashboard | Bearer | handleDashboard |
+| GET | /api/events | Bearer | handleEvents |
+| GET | /api/events/{id} | Bearer | handleEvent |
+| GET | /api/timeline | Bearer | handleTimeline |
+| GET | /api/identities | Bearer | handleIdentities |
+| GET | /api/identities/{id} | Bearer | handleIdentity |
+| GET | /api/search | Bearer | handleSearch |
+| GET | /api/threads/{id} | Bearer | handleThread |

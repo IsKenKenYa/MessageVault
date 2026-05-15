@@ -44,6 +44,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Repo hygiene
         run: bash scripts/check-repo-hygiene.sh
+      - name: Reference governance
+        run: bash scripts/check-reference-governance.sh
       - name: Android i18n keys
         run: bash scripts/check-android-i18n.sh
       - name: Agent skills mirror
