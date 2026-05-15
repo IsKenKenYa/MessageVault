@@ -1,7 +1,12 @@
 <template>
   <div class="page-grid">
     <section class="toolbar">
-      <ElInput v-model="query" placeholder="Search SMS text, transcript, or summary" clearable @keyup.enter="load" />
+      <ElInput
+        v-model="query"
+        placeholder="Search SMS text, transcript, or summary"
+        clearable
+        @keyup.enter="load"
+      />
       <ElButton type="primary" @click="load">Search</ElButton>
     </section>
 
@@ -50,7 +55,10 @@
     try {
       const offset = (currentPage.value - 1) * pageSize
       results.value = await fetchSearch({ q: query.value, limit: pageSize, offset })
-      total.value = results.value.length === pageSize ? (currentPage.value * pageSize + pageSize) : (offset + results.value.length)
+      total.value =
+        results.value.length === pageSize
+          ? currentPage.value * pageSize + pageSize
+          : offset + results.value.length
     } finally {
       loading.value = false
     }

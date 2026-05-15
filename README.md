@@ -4,127 +4,57 @@
 
 > Turn communication into memory.
 
-Commory 是一个通信记忆系统，用来把短信、通话记录、联系人以及后续可扩展的通信数据，转成结构化、可查询、AI-ready 的数据资产。
+Commory 是一个本地优先的通信记忆系统，用来把短信、通话记录、联系人以及后续可扩展的数据源转成结构化、可查询、可同步、AI-ready 的个人数据资产。
 
-它不是一个“把文件备份出来就结束”的工具集合。对 Commory 来说，备份只是入口，目标是让个人通信数据变成可以持续使用、分析和构建的基础设施。
+Commory 不是“导出一个备份文件就结束”的工具。备份是入口，目标是让个人通信历史成为长期可维护的数据层。
 
-## What Is Commory
-
-Commory 面向三个层次的问题：
-
-- 数据采集：从 Android 端把 SMS、Call Log、Contacts 等数据稳定导入
-- 数据建模：通过 `MsgLayer` 抽象统一 schema、导出格式和后续 SDK 能力
-- 数据使用：提供预览、检索、分析，以及未来的 CLI、插件和 Agent 集成能力
-
-你可以把它理解成：
-
-- `Commory` = 产品层 / 体验层
-- `MsgLayer` = 通信数据层 / SDK / schema 能力
-
-## Why It’s Different
-
-传统备份工具的重点是：
-
-- 导出文件
-- 保存文件
-- 恢复文件
-
-Commory 的重点是：
-
-- 生成结构化数据
-- 建立长期可维护的数据层
-- 让通信历史可以被检索、分析、组合和复用
-
-换句话说：
-
-- 传统工具产出的是 backup files
-- Commory 产出的是 structured, queryable, AI-ready data
-
-## Architecture
+## 架构
 
 ```text
 Commory
-├── Ingestion Layer
-│   └── Android app
-├── MsgLayer
-│   ├── schema
-│   ├── export models
-│   └── future SDK / CLI interfaces
-├── Viewer Layer
-│   └── previewer
-└── Future Extensions
-    ├── CLI
-    ├── plugins
-    ├── local analysis
-    └── agent integrations
+├── android/     # Android 客户端：本地备份、恢复、可选服务器同步
+├── backend/     # Commory Server：认证、导入、查询、自托管 API
+├── web/         # Vue dashboard：服务器管理与查看体验
+├── msglayer/    # Canonical schema：跨端通信数据契约
+├── docs/        # 当前工程标准与 API 文档
+├── scripts/     # CI 与治理脚本
+├── previewer/   # 历史 XML SMS viewer 归档，不再更新
+└── references/  # 只读外部参考源码
 ```
 
-当前仓库的第一阶段重点，是先把现有 Android 采集能力和 Web 预览能力，收束到 `Commory / MsgLayer` 这套统一叙事之下。
+当前状态是“本地备份 + 可选服务器上传”。下一步演进目标是双向同步：上传、远程恢复、增量同步。远期方向是端到端加密、多设备同步和 AI Agent 上下文。
 
-## Components
+核心原则保持不变：本地优先，服务器可选，隐私可控。
+
+## 组件
 
 ### `android/`
 
-现有的 Android 入口层，负责设备侧的数据采集、导出、恢复和平台集成。
+Commory Android 客户端，负责设备侧数据采集、MsgLayer 导出、本地恢复、运行模式选择和可选服务器同步。
 
-- 角色：ingestion layer
-- 现状：已具备 SMS / 通话记录 / 联系人相关能力
-- 技术栈：Kotlin、Jetpack Compose、Material 3、MVVM、多模块 SDK
+- 包名：`com.iskenkenya.commory`
+- app namespace：`com.iskenkenya.commory.mobile`
+- SDK namespace：`com.iskenkenya.commory.sdk.*`
+- 技术栈：Kotlin、Jetpack Compose、Material 3、DataStore、Retrofit、多模块 SDK
 
-其中现有 `sdk/backup`、`sdk/auth`、`sdk/storage` 是后续收束到 `MsgLayer` 方向的重要基础。
+### `backend/`
+
+自托管 Commory Server，负责认证、Refresh Token、MsgLayer 导入、查询、时间线、搜索和移动端 API。
+
+- 技术栈：Go、标准库 HTTP、SQLite/PostgreSQL provider
+- 契约文档：[docs/mobile-api.md](docs/mobile-api.md)
+
+### `web/`
+
+服务器端 dashboard，基于 Vue 3、Vite、Element Plus，用于管理与查看 server-backed 数据。
+
+### `msglayer/`
+
+Commory 的 canonical interchange format。Android 输出 MsgLayer JSON，backend 验证并导入，未来 CLI/SDK/Agent 能力也围绕 MsgLayer 演进。
 
 ### `previewer/`
 
-现有的查看层，用于浏览和分析导出的通信数据。
-
-- 角色：viewer layer
-- 现状：支持基于 XML 导出内容的本地预览与基础分析
-- 技术栈：Vue 3、Vite、Tailwind CSS
-
-`SMS Previewer` 在当前阶段仍然保留为已有组件名称，但不再作为项目主品牌。
-
-## Use Cases
-
-- 搜索自己的通信历史
-- 查看联系人互动脉络和时间线
-- 对短信和通话记录做本地分析
-- 为个人知识库或 Agent 提供结构化通信数据
-- 在自托管环境中保留长期可用的数据资产
-
-## Roadmap
-
-第一阶段是对外表达与仓库组织收束；后续路线包括：
-
-- `MsgLayer` 命名与接口继续清晰化
-- CLI 能力
-- 插件化扩展
-- 更多数据源接入
-- 本地分析与 AI/Agent 集成
-- 统一 viewer 与 mobile 的数据模型
-
-## References
-
-`references/` 用来存放只读参考源码，不参与当前项目构建、发布和许可证主体。
-
-当前包含：
-
-- `references/art-design-pro/`
-  - 来源：`https://github.com/Daymychen/art-design-pro.git`
-  - 用途：UI、交互和工程组织参考
-  - 规则：默认只读，不在本仓直接修改其镜像内容
-
-如果你是贡献者，请不要把 `references/` 下的外部参考代码视为当前项目功能开发目录。
-
-## Current Naming Status
-
-这个仓库正处在品牌与文档收束的第一阶段。
-
-- 首页主品牌现在统一使用 `Commory`
-- `MsgLayer` 是正式的数据层架构名
-- 仓库历史、源码命名和远程地址中仍可见 `MessageVault`
-- `SMS Previewer` 仍作为现有 viewer 组件名称存在
-
-这意味着本次改造只更新对外可见文案，不修改源码包名、Gradle module 名或运行时代码行为。
+历史 XML SMS viewer 归档。它保留作为项目早期代码存档，不参与当前构建、CI、规范迁移或功能路线。
 
 ## Quick Start
 
@@ -132,43 +62,46 @@ Commory
 
 ```bash
 cd android
-./gradlew build
+./gradlew :app:compileDebugKotlin
+./gradlew :app:testDebugUnitTest
 ```
 
-### Previewer
+### Backend
 
 ```bash
-cd previewer
+cd backend
+go test ./...
+go run ./cmd/commory
+```
+
+### Web
+
+```bash
+cd web
 pnpm install
 pnpm dev
 ```
 
-### Clone With Submodules
+## Governance
+
+- Agent 入口：[AGENTS.md](AGENTS.md)
+- 工程标准：[docs/engineering-standards.md](docs/engineering-standards.md)
+- 项目治理：[NOTICE.md](NOTICE.md)
+- 当前移动端契约：[docs/mobile-api.md](docs/mobile-api.md)
+
+`.agents/skills` 是项目 Skills 的唯一手工维护来源，`.claude/skills` 是 Claude Code 兼容镜像。更新 Skills 后运行：
 
 ```bash
-git clone <your-repo-url>
-cd Commory
-git submodule update --init --recursive
+bash scripts/sync-agent-skills.sh
 ```
 
-## GitHub Description
+## Roadmap
 
-推荐仓库描述：
-
-```text
-🧠 Commory · 通信记忆系统｜SMS/Call → Structured Data & AI｜Self-hosted · Privacy-first · Powered by MsgLayer
-```
-
-## Contributing
-
-开始开发前请先阅读 [NOTICE.md](NOTICE.md)。
-
-- Android 与 Previewer 保持现有构建方式
-- 新的命名收束优先落在文档和架构表达层
-- `references/` 为只读参考区，不作为功能实现目录
+- 阶段 1：安全与健壮性补全，包括 Android logout 调服务端、401 自动刷新、去除阻塞快照、CI Java 25、治理规范收束。
+- 阶段 2：移动端体验完善，包括网络错误分类、token 过期判断、模式切换确认、服务器地址默认策略、Retrofit 缓存。
+- 阶段 3：契约测试补全，包括 refresh 轮换、logout 吊销、setup 初始化防重、web lint/build CI。
+- 阶段 4：功能扩展，包括远程恢复、搜索与时间线、推送通知、MsgLayer v0.2、端到端加密、多设备同步。
 
 ## License
 
-本仓库根目录代码采用 [GNU General Public License v3.0](LICENSE)。
-
-`references/` 下的外部子模块保持其各自上游仓库的许可证和版权归属，不自动并入本仓主许可证主体。
+本仓库根目录代码采用 [GNU General Public License v3.0](LICENSE)。`references/` 下外部参考代码保持其上游许可证。

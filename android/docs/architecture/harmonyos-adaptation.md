@@ -4,7 +4,7 @@
 
 ### 1.1 背景
 
-随着华为 HarmonyOS 的快速发展和市场份额持续增长，越来越多的用户在鸿蒙系统上使用 MessageVault。鸿蒙系统从 NEXT 版本开始不再兼容 Android APK，这意味着 MessageVault 需要开发原生鸿蒙版本以覆盖这部分用户群体。
+随着华为 HarmonyOS 的快速发展和市场份额持续增长，越来越多的用户在鸿蒙系统上使用 Commory。鸿蒙系统从 NEXT 版本开始不再兼容 Android APK，这意味着 Commory 需要开发原生鸿蒙版本以覆盖这部分用户群体。
 
 ### 1.2 目标
 
@@ -123,7 +123,7 @@ sdk/backup-shared/
 ├── build.gradle.kts          # KMP 构建配置
 ├── src/
 │   ├── commonMain/kotlin/    # 共享代码
-│   │   └── imken/messagevault/shared/
+│   │   └── imken/commory/shared/
 │   │       ├── model/        # 数据模型
 │   │       ├── state/        # 状态定义
 │   │       └── util/         # 工具类
@@ -208,7 +208,7 @@ graph TB
 ### 4.3 项目结构
 
 ```
-messagevault-harmony/
+commory-harmony/
 ├── entry/
 │   └── src/main/
 │       ├── ets/

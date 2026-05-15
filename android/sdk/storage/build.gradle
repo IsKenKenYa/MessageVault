@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace 'imken.messagevault.sdk.storage'
+    namespace 'com.iskenkenya.commory.sdk.storage'
     compileSdk 35
     buildToolsVersion "36.1.0"
 

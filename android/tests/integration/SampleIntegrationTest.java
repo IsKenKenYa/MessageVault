@@ -1,4 +1,4 @@
-package imken.messagevault.mobile;
+package com.iskenkenya.commory.mobile;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -26,7 +26,7 @@ public class SampleIntegrationTest {
         // 获取应用Context
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
         // 包名验证 - 确保测试运行在正确的应用上
-        assertEquals("imken.messagevault.mobile", appContext.getPackageName());
+        assertEquals("com.iskenkenya.commory.mobile", appContext.getPackageName());
     }
     
     /**

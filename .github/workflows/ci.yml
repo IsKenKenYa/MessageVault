@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '25'
       - name: Android compile
         working-directory: android
         run: sh ./gradlew :app:compileDebugKotlin
@@ -46,5 +46,26 @@ jobs:
         run: bash scripts/check-repo-hygiene.sh
       - name: Android i18n keys
         run: bash scripts/check-android-i18n.sh
+      - name: Agent skills mirror
+        run: bash scripts/sync-agent-skills.sh --check
       - name: LOC report
         run: bash scripts/report-loc-complexity.sh
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enable corepack
+        run: corepack enable
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        working-directory: web
+        run: pnpm lint
+      - name: Build
+        working-directory: web
+        run: pnpm build

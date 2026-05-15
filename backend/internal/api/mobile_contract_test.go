@@ -118,6 +118,77 @@ func TestMobileSetupProbeContract(t *testing.T) {
 	}
 }
 
+func TestMobileRefreshRotatesRefreshToken(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	session := registerMobileSession(t, handler, "refresh-user", "refresh@example.com")
+
+	firstRefresh := refreshMobileSession(t, handler, session.RefreshToken)
+	if firstRefresh.RefreshToken == "" || firstRefresh.RefreshToken == session.RefreshToken {
+		t.Fatal("expected refresh token rotation")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
+		"refreshToken": session.RefreshToken,
+	})))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old refresh token to be rejected, got %d", res.Code)
+	}
+}
+
+func TestMobileLogoutRevokesRefreshToken(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	session := registerMobileSession(t, handler, "logout-user", "logout@example.com")
+
+	logoutReq := httptest.NewRequest(http.MethodPost, "/api/auth/logout", bytes.NewReader(mustJSON(t, map[string]string{
+		"refreshToken": session.RefreshToken,
+	})))
+	logoutReq.Header.Set("Content-Type", "application/json")
+	logoutRes := httptest.NewRecorder()
+	handler.ServeHTTP(logoutRes, logoutReq)
+	if logoutRes.Code != http.StatusOK {
+		t.Fatalf("logout status = %d, body = %s", logoutRes.Code, logoutRes.Body.String())
+	}
+
+	refreshReq := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
+		"refreshToken": session.RefreshToken,
+	})))
+	refreshReq.Header.Set("Content-Type", "application/json")
+	refreshRes := httptest.NewRecorder()
+	handler.ServeHTTP(refreshRes, refreshReq)
+	if refreshRes.Code != http.StatusUnauthorized {
+		t.Fatalf("expected revoked refresh token to fail, got %d", refreshRes.Code)
+	}
+}
+
+func TestMobileSetupInitializeRejectsRepeat(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	payload := mustJSON(t, map[string]string{
+		"userName":        "admin",
+		"password":        "passw0rd!",
+		"confirmPassword": "passw0rd!",
+		"usageMode":       "personal",
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/setup", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("setup init status = %d, body = %s", res.Code, res.Body.String())
+	}
+
+	repeatReq := httptest.NewRequest(http.MethodPost, "/api/setup", bytes.NewReader(payload))
+	repeatReq.Header.Set("Content-Type", "application/json")
+	repeatRes := httptest.NewRecorder()
+	handler.ServeHTTP(repeatRes, repeatReq)
+	if repeatRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected repeated setup to fail, got %d", repeatRes.Code)
+	}
+}
+
 func newTestMobileHandler(t *testing.T) http.Handler {
 	t.Helper()
 	store, err := storage.NewSQLiteProvider(filepath.Join(t.TempDir(), "commory.json"))
@@ -138,6 +209,16 @@ func newTestMobileHandler(t *testing.T) http.Handler {
 
 func registerMobileUser(t *testing.T, handler http.Handler, userName, email string) string {
 	t.Helper()
+	return registerMobileSession(t, handler, userName, email).Token
+}
+
+type mobileAuthSession struct {
+	Token        string
+	RefreshToken string
+}
+
+func registerMobileSession(t *testing.T, handler http.Handler, userName, email string) mobileAuthSession {
+	t.Helper()
 	body := map[string]string{
 		"userName": userName,
 		"email":    email,
@@ -156,14 +237,48 @@ func registerMobileUser(t *testing.T, handler http.Handler, userName, email stri
 	}
 	var envelope struct {
 		Data struct {
-			Token string `json:"token"`
+			Token        string `json:"token"`
+			RefreshToken string `json:"refreshToken"`
 		} `json:"data"`
 	}
 	decodeJSON(t, res.Body.Bytes(), &envelope)
-	if envelope.Data.Token == "" {
-		t.Fatal("expected auth token")
+	if envelope.Data.Token == "" || envelope.Data.RefreshToken == "" {
+		t.Fatal("expected auth token pair")
 	}
-	return envelope.Data.Token
+	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: envelope.Data.RefreshToken}
+}
+
+func refreshMobileSession(t *testing.T, handler http.Handler, refreshToken string) mobileAuthSession {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
+		"refreshToken": refreshToken,
+	})))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("refresh status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var envelope struct {
+		Data struct {
+			Token        string `json:"token"`
+			RefreshToken string `json:"refreshToken"`
+		} `json:"data"`
+	}
+	decodeJSON(t, res.Body.Bytes(), &envelope)
+	if envelope.Data.Token == "" || envelope.Data.RefreshToken == "" {
+		t.Fatal("expected refreshed token pair")
+	}
+	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: envelope.Data.RefreshToken}
+}
+
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func readFixture(t *testing.T, parts ...string) []byte {

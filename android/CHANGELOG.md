@@ -1,6 +1,19 @@
 # 变更日志
 
-本文件记录MessageVault-Mobile组件的所有重要变更。
+本文件记录 Commory Android 组件的重要变更。历史条目可能保留旧项目名，用于说明迁移来源。
+
+## [未发布]
+
+### 新增
+- 建立 Commory Android 命名规范：应用 ID 为 `com.iskenkenya.commory`，客户端 namespace 为 `com.iskenkenya.commory.mobile`，SDK namespace 为 `com.iskenkenya.commory.sdk.*`。
+- 将 AI 辅助编辑历史从独立 `AI_EDIT_LOG.md` 流程迁移到标准 changelog / PR / commit 描述流程。
+
+### 修改
+- 将 Android 项目名称、用户可见品牌、日志 tag、主题名和当前文档统一为 Commory。
+- 将旧包名 `imken.messagevault.*` 迁移到 `com.iskenkenya.commory.*`。
+
+### 移除
+- 移除 `AI_EDIT_LOG.md` 和旧调试修复报告，后续不再维护非标准旁路记录。
 
 ## [未发布] - 2025-05-13
 
@@ -133,4 +146,4 @@
 - MainActivity基本实现，支持权限请求和基本界面
 - 基本布局文件（activity_main.xml）
 - 字符串资源文件（strings.xml）
-- Gradle构建配置 
+- Gradle构建配置

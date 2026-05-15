@@ -58,7 +58,10 @@
       filters.offset = offset
       filters.limit = pageSize
       items.value = await fetchTimeline(filters)
-      total.value = items.value.length === pageSize ? (currentPage.value * pageSize + pageSize) : (offset + items.value.length)
+      total.value =
+        items.value.length === pageSize
+          ? currentPage.value * pageSize + pageSize
+          : offset + items.value.length
     } finally {
       loading.value = false
     }

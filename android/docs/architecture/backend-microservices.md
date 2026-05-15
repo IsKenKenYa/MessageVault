@@ -3,7 +3,7 @@
 ## 1. 概述
 
 ### 1.1 为什么需要后端微服务架构
-MessageVault 目前以本地备份为核心，所有数据存储在设备端。以下需求驱动了后端微服务架构的引入：
+Commory 目前以本地备份为核心，所有数据存储在设备端。以下需求驱动了后端微服务架构的引入：
 
 | 需求 | 说明 |
 |------|------|
@@ -280,22 +280,22 @@ services:
     depends_on: [auth-service, backup-service, ai-service]
     restart: unless-stopped
   auth-service:
-    image: messagevault/auth-service:latest
+    image: commory/auth-service:latest
     environment: [DATABASE_URL=postgresql://mvault:mvault@postgres:5432/mvault_auth, REDIS_URL=redis://redis:6379/0, JWT_SECRET=${JWT_SECRET}]
     depends_on: [postgres, redis]
     restart: unless-stopped
   backup-service:
-    image: messagevault/backup-service:latest
+    image: commory/backup-service:latest
     environment: [DATABASE_URL=postgresql://mvault:mvault@postgres:5432/mvault_backup, MINIO_ENDPOINT=minio:9000, MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}, MINIO_SECRET_KEY=${MINIO_SECRET_KEY}]
     depends_on: [postgres, minio]
     restart: unless-stopped
   ai-service:
-    image: messagevault/ai-service:latest
+    image: commory/ai-service:latest
     environment: [DATABASE_URL=postgresql://mvault:mvault@postgres:5432/mvault_ai, CHROMA_HOST=chromadb, CHROMA_PORT=8000, OPENAI_API_KEY=${OPENAI_API_KEY:-}]
     depends_on: [postgres, chromadb]
     restart: unless-stopped
   push-service:
-    image: messagevault/push-service:latest
+    image: commory/push-service:latest
     environment: [REDIS_URL=redis://redis:6379/1]
     depends_on: [redis]
     restart: unless-stopped

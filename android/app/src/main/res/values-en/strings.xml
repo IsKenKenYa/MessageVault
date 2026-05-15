@@ -1,23 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MessageVault</string>
-    <string name="app_title">MessageVault</string>
-    <string name="welcome_message">Welcome to MessageVault</string>
+    <string name="app_name">Commory</string>
+    <string name="app_title">Commory</string>
+    <string name="welcome_message">Welcome to Commory</string>
     <string name="backup_button">Backup Data</string>
     <string name="restore_button">Restore Data</string>
     <string name="permission_required">Permissions Required</string>
-    <string name="permission_prompt">MessageVault needs access to SMS and call log permissions to work properly. Please grant these permissions in settings.</string>
+    <string name="permission_prompt">Commory needs access to SMS and call log permissions to work properly. Please grant these permissions in settings.</string>
     <string name="ok">OK</string>
     <string name="settings">Settings</string>
     <string name="app_description">Backup and restore your SMS and call logs</string>
     <string name="mode_title">Choose a run mode</string>
-    <string name="mode_subtitle">MessageVault can run fully on-device or connect to a self-hosted Commory server for sync and search.</string>
+    <string name="mode_subtitle">Commory can run fully on-device or connect to a self-hosted Commory server for sync and search.</string>
     <string name="mode_local_title">Local Only</string>
     <string name="mode_local_body">Backup files stay on this device. No account is required, and the app works offline.</string>
     <string name="mode_server_title">Commory Server</string>
     <string name="mode_server_body">Connect to a self-hosted Commory server for accounts, remote import history, uploads, and cross-device access.</string>
     <string name="mode_use_local">Use local mode</string>
     <string name="mode_connect_server">Connect server</string>
+    <string name="mode_switch_confirm_title">Switch run mode?</string>
+    <string name="mode_switch_to_local_body">Switching to local mode signs out of the server account but keeps local backup files.</string>
+    <string name="mode_switch_to_server_body">Server mode requires a server URL and account. Local backup still saves to this device first.</string>
+    <string name="mode_switch_confirm">Switch</string>
     <string name="server_setup_title">Connect Commory Server</string>
     <string name="server_setup_body">Enter your server URL and sign in. The app still creates a local backup first, then uploads when sync is enabled.</string>
     <string name="server_url">Server URL</string>

@@ -4,7 +4,7 @@
 
 ### 1.1 背景
 
-MessageVault 当前仅支持本地模式，无需登录即可使用。随着云端同步、AI 分析等功能引入，需要建立统一用户身份体系，支持多种登录方式。
+Commory 当前仅支持本地模式，无需登录即可使用。随着云端同步、AI 分析等功能引入，需要建立统一用户身份体系，支持多种登录方式。
 
 ### 1.2 设计目标
 
@@ -172,7 +172,7 @@ class LocalAuthProvider(
 ```mermaid
 sequenceDiagram
     participant User as 用户
-    participant App as MessageVault
+    participant App as Commory
     participant Local as LocalAuthProvider
     participant Store as TokenStore
 
@@ -250,7 +250,7 @@ class FeiniuAuthProvider(
 ```mermaid
 sequenceDiagram
     participant User as 用户
-    participant App as MessageVault
+    participant App as Commory
     participant Browser as 系统浏览器
     participant Server as 非牛认证服务器
 

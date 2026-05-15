@@ -1,4 +1,4 @@
-package imken.messagevault.mobile;
+package com.iskenkenya.commory.mobile;
 
 import org.junit.Test;
 import static org.junit.Assert.*;

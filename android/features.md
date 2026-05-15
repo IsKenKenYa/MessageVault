@@ -1,6 +1,6 @@
-# MessageVault Mobile 功能需求
+# Commory Android 功能需求
 
-本文档列出了MessageVault-Mobile应用的所有核心功能和实现原则，以指导开发流程和优先级排序。
+本文档列出了Commory Android应用的所有核心功能和实现原则，以指导开发流程和优先级排序。
 
 ## 当前开发状态
 
@@ -158,7 +158,7 @@
 项目已从单模块架构重构为多模块架构，核心逻辑提取为独立的SDK模块，实现关注点分离和跨平台复用：
 
 ```
-MessageVault-Mobile/
+Commory Android/
 ├── sdk/backup/          # 纯Kotlin备份/恢复SDK
 ├── sdk/auth/            # 纯Kotlin认证组件
 ├── sdk/storage/         # Android Library存储组件

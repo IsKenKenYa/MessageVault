@@ -16,6 +16,7 @@ Thumbs.db
 android/.gradle/
 android/build/
 android/app/build/
+android/app/debug/
 android/local.properties
 android/*.apk
 android/*.aab
@@ -39,8 +40,12 @@ web/.auto-import.json
 # Coverage
 coverage/
 *.coverprofile
+coverage.out
 
 # Trae
 .trae/
 .playwright-mcp/
 backend/data/
+
+# Non-standard generated reports
+**/AI_EDIT_LOG.md

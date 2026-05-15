@@ -42,7 +42,7 @@ Errors use the same envelope with `data: null` and an HTTP status code matching 
 
 - `POST /api/auth/refresh`
 - Body: `{ "refreshToken": "refresh" }`
-- Response data: `{ "accessToken": "access", "refreshToken": "refresh" }`
+- Response data: `{ "token": "access", "refreshToken": "refresh" }`
 
 Android sends authenticated requests with `Authorization: Bearer <access token>`.
 

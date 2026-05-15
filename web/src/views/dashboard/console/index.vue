@@ -4,7 +4,9 @@
       <div>
         <p class="eyebrow">Commory</p>
         <h2>MsgLayer archive overview</h2>
-        <p class="subtext">Imports, events, identities, and the latest activity for the signed-in archive.</p>
+        <p class="subtext"
+          >Imports, events, identities, and the latest activity for the signed-in archive.</p
+        >
       </div>
       <ElButton type="primary" @click="router.push('/dashboard/imports')">Open Imports</ElButton>
     </section>
@@ -34,7 +36,9 @@
       <div class="panel">
         <div class="panel-header">
           <h3>Recent events</h3>
-          <ElButton link type="primary" @click="router.push('/dashboard/timeline')">View Timeline</ElButton>
+          <ElButton link type="primary" @click="router.push('/dashboard/timeline')"
+            >View Timeline</ElButton
+          >
         </div>
         <div class="event-list">
           <div v-for="event in summary?.recentEvents || []" :key="event.event_id" class="event-row">

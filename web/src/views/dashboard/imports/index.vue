@@ -1,7 +1,12 @@
 <template>
   <div class="page-grid">
     <section class="toolbar">
-      <ElUpload :auto-upload="false" :show-file-list="false" :on-change="handleFileChange" accept=".json">
+      <ElUpload
+        :auto-upload="false"
+        :show-file-list="false"
+        :on-change="handleFileChange"
+        accept=".json"
+      >
         <ElButton>Choose MsgLayer File</ElButton>
       </ElUpload>
       <span class="file-name">{{ selectedFile?.name || 'No file selected' }}</span>

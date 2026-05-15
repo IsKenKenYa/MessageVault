@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 使用Material 3主题 -->
-    <style name="Theme.MessageVault" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.Commory" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Material 3属性 -->
         <item name="colorPrimary">@color/purple_500</item>
         <item name="colorPrimaryDark">@color/purple_700</item>
@@ -14,7 +14,7 @@
     </style>
     
     <!-- 夜间模式主题 -->
-    <style name="Theme.MessageVault.Dark" parent="Theme.Material3.Dark.NoActionBar">
+    <style name="Theme.Commory.Dark" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Material 3属性 -->
         <item name="colorPrimary">@color/purple_200</item>
         <item name="colorPrimaryVariant">@color/purple_700</item>

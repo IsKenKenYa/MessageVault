@@ -31,8 +31,12 @@
         </div>
 
         <ElDescriptions :column="1" border>
-          <ElDescriptionsItem label="Phones">{{ selected.phones.join(', ') || '-' }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="Emails">{{ selected.emails.join(', ') || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="Phones">{{
+            selected.phones.join(', ') || '-'
+          }}</ElDescriptionsItem>
+          <ElDescriptionsItem label="Emails">{{
+            selected.emails.join(', ') || '-'
+          }}</ElDescriptionsItem>
           <ElDescriptionsItem label="Source">{{ selected.meta?.source || '-' }}</ElDescriptionsItem>
         </ElDescriptions>
 
@@ -46,7 +50,9 @@
           </div>
         </div>
       </template>
-      <div v-else class="empty-state">Select a contact to inspect its MsgLayer identity and recent activity.</div>
+      <div v-else class="empty-state"
+        >Select a contact to inspect its MsgLayer identity and recent activity.</div
+      >
     </section>
   </div>
 </template>

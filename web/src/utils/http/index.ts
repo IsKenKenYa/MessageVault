@@ -1,4 +1,9 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import axios, {
+  AxiosError,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig
+} from 'axios'
 import { useUserStore } from '@/store/modules/user'
 import { ApiStatus } from './status'
 import { HttpError, handleError, showError, showSuccess } from './error'
@@ -59,10 +64,12 @@ axiosInstance.interceptors.response.use(
       method: response.config.method?.toUpperCase()
     })
   },
-  async (error: AxiosError<{
-    code?: number
-    msg?: string
-  }>) => {
+  async (
+    error: AxiosError<{
+      code?: number
+      msg?: string
+    }>
+  ) => {
     const originalConfig = (error.config || {}) as ExtendedAxiosRequestConfig
     const responseStatus = error.response?.status
     const shouldTryRefresh =

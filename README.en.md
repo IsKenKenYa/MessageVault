@@ -2,68 +2,69 @@
 
 > Turn communication into memory.
 
-Commory is a communication memory system that transforms SMS, call logs, contacts, and future communication sources into structured, queryable, AI-ready data.
+Commory is a local-first communication memory system. It turns SMS, call logs, contacts, and future communication sources into structured, queryable, syncable, AI-ready personal data assets.
 
-This repository is in the first phase of a public-facing rename and positioning cleanup. The product brand is now `Commory`, and `MsgLayer` is the name of the underlying communication data layer.
-
-## Positioning
-
-Commory is not a backup-first tool.
-
-- Traditional tools produce backup files
-- Commory aims to produce structured data assets that can be searched, analyzed, and reused
-
-In this repository today:
-
-- `android/` is the ingestion layer
-- `previewer/` is the viewer layer
-- existing SDK modules are the foundation for the future `MsgLayer`
+Commory is not a backup-file-only tool. Backup is the entry point; the goal is a durable data layer for personal communication history.
 
 ## Architecture
 
 ```text
 Commory
-├── Ingestion Layer
-│   └── Android app
-├── MsgLayer
-│   ├── schema
-│   ├── export models
-│   └── future SDK / CLI interfaces
-├── Viewer Layer
-│   └── previewer
-└── Future Extensions
-    ├── CLI
-    ├── plugins
-    ├── local analysis
-    └── agent integrations
+├── android/     # Android client: local backup, restore, optional server sync
+├── backend/     # Commory Server: auth, imports, query, self-hosted API
+├── web/         # Vue dashboard for server-backed workflows
+├── msglayer/    # Canonical cross-platform communication schema
+├── docs/        # Current engineering and API documentation
+├── scripts/     # CI and governance scripts
+├── previewer/   # Historical XML SMS viewer archive; do not update
+└── references/  # Read-only external reference code
 ```
 
-## References
+The current product state is local backup plus optional server upload. The next step is bidirectional sync: upload, remote restore, and incremental sync. Long-term directions include end-to-end encryption, multi-device sync, and AI Agent context.
 
-`references/` contains read-only external source references.
+The core principles remain: local-first, server-optional, privacy-controlled.
 
-Current entry:
+## Components
 
-- `references/art-design-pro/`
-  - source: `https://github.com/Daymychen/art-design-pro.git`
-  - purpose: UI, interaction, and project-structure reference
-  - status: read-only in this repository
+- `android/`: Commory Android client. App id is `com.iskenkenya.commory`; app source namespace is `com.iskenkenya.commory.mobile`; SDK namespaces are `com.iskenkenya.commory.sdk.*`.
+- `backend/`: self-hosted Commory Server in Go. The mobile API contract lives in `docs/mobile-api.md`.
+- `web/`: Vue 3, Vite, and Element Plus dashboard.
+- `msglayer/`: canonical JSON Schema interchange format.
+- `previewer/`: historical XML SMS viewer archive. It is kept as old code and is not part of current CI, docs, or roadmap work.
 
-## Naming Status
+## Quick Start
 
-- Public brand: `Commory`
-- Data layer name: `MsgLayer`
-- Historical names such as `MessageVault` and `SMS Previewer` still exist in repository history and some component-level docs
-- This phase does not rename package names, Gradle modules, or runtime code identifiers
+```bash
+cd android
+./gradlew :app:compileDebugKotlin
+./gradlew :app:testDebugUnitTest
+```
 
-## GitHub Description
+```bash
+cd backend
+go test ./...
+go run ./cmd/commory
+```
 
-```text
-🧠 Commory · 通信记忆系统｜SMS/Call → Structured Data & AI｜Self-hosted · Privacy-first · Powered by MsgLayer
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+
+## Governance
+
+- Agent entrypoint: `AGENTS.md`
+- Engineering standards: `docs/engineering-standards.md`
+- Governance notice: `NOTICE.md`
+- Mobile API contract: `docs/mobile-api.md`
+
+`.agents/skills` is the source of truth for project skills. `.claude/skills` is the Claude Code compatibility mirror. After changing skills, run:
+
+```bash
+bash scripts/sync-agent-skills.sh
 ```
 
 ## License
 
-The root repository remains under the [GNU General Public License v3.0](LICENSE).
-
-External submodules under `references/` keep their own upstream licenses and ownership.
+The root repository is licensed under [GNU General Public License v3.0](LICENSE). External references under `references/` keep their upstream licenses.

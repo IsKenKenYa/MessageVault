@@ -18,6 +18,10 @@
     <string name="mode_server_body">连接自托管 Commory 服务端，支持账号、远程导入列表、上传和跨设备访问。</string>
     <string name="mode_use_local">使用本地模式</string>
     <string name="mode_connect_server">连接服务端</string>
+    <string name="mode_switch_confirm_title">切换运行模式？</string>
+    <string name="mode_switch_to_local_body">切换到本地模式会退出当前服务端账号，但不会删除本地备份文件。</string>
+    <string name="mode_switch_to_server_body">切换到服务端模式后，需要填写服务端地址并登录账号；本地备份仍会先保存到设备。</string>
+    <string name="mode_switch_confirm">确认切换</string>
     <string name="server_setup_title">连接 Commory 服务端</string>
     <string name="server_setup_body">输入服务端地址并登录账号。应用仍会先创建本地备份，再按设置上传到服务端。</string>
     <string name="server_url">服务端地址</string>
