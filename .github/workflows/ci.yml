@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Format check
+        run: test -z "$(gofmt -l backend)"
+      - name: Vet
+        working-directory: backend
+        run: go vet ./...
+      - name: Test
+        working-directory: backend
+        run: go test ./... -coverprofile=coverage.out
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android compile
+        working-directory: android
+        run: sh ./gradlew :app:compileDebugKotlin
+      - name: Android unit tests
+        working-directory: android
+        run: sh ./gradlew :app:testDebugUnitTest
+
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repo hygiene
+        run: bash scripts/check-repo-hygiene.sh
+      - name: Android i18n keys
+        run: bash scripts/check-android-i18n.sh
+      - name: LOC report
+        run: bash scripts/report-loc-complexity.sh

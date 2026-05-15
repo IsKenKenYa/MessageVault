@@ -17,11 +17,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import imken.messagevault.mobile.config.Config
+import imken.messagevault.mobile.di.AppContainer
+import imken.messagevault.mobile.runtime.AppEnvironmentManager
+import imken.messagevault.mobile.runtime.LocaleResolver
 import imken.messagevault.mobile.ui.navigation.MessageVaultAppWithNavigation
 import imken.messagevault.mobile.ui.navigation.NavigationItem
 import imken.messagevault.mobile.ui.navigation.navigationItems
 import imken.messagevault.mobile.ui.permission.PermissionHandler
 import imken.messagevault.mobile.ui.theme.MessageVaultTheme
+import imken.messagevault.mobile.ui.viewmodels.AppViewModel
 import imken.messagevault.mobile.ui.viewmodels.BackupViewModel
 import imken.messagevault.mobile.ui.viewmodels.RestoreViewModel
 import imken.messagevault.mobile.utils.DefaultSmsAppHelper
@@ -36,6 +40,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var config: Config
+    private lateinit var appContainer: AppContainer
     private lateinit var permissionHandler: PermissionHandler
     private lateinit var defaultSmsAppHelper: DefaultSmsAppHelper
 
@@ -57,6 +62,7 @@ class MainActivity : ComponentActivity() {
         Log.d("MessageVault", "主活动创建 - 直接Log测试")
 
         config = Config.getInstance(this)
+        appContainer = AppContainer(applicationContext)
         permissionHandler = PermissionHandler(this)
         defaultSmsAppHelper = DefaultSmsAppHelper(this)
 
@@ -64,8 +70,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MessageVaultTheme {
+                val appViewModel: AppViewModel = viewModel(
+                    factory = AppViewModel.Factory(appContainer)
+                )
+
                 val backupViewModel: BackupViewModel = viewModel(
-                    factory = BackupViewModel.Factory(this)
+                    factory = BackupViewModel.ContainerFactory(this, appContainer)
                 )
 
                 val restoreViewModel: RestoreViewModel = viewModel(
@@ -73,7 +83,7 @@ class MainActivity : ComponentActivity() {
                 )
 
                 if (!initialPermissionsChecked) {
-                    val permissionsGranted = permissionHandler.checkPermissions()
+                    val permissionsGranted = permissionHandler.checkBackupPermissions()
                     backupViewModel.setPermissionsGranted(permissionsGranted)
                     restoreViewModel.setPermissionsGranted(permissionsGranted)
                     initialPermissionsChecked = true
@@ -84,6 +94,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MessageVaultAppWithNavigation(
+                        appViewModel = appViewModel,
                         backupViewModel = backupViewModel,
                         restoreViewModel = restoreViewModel,
                         navigationItems = navigationItems
@@ -96,8 +107,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun applyLanguage() {
-        val langCode = config.getLanguage()
-        val locale = Locale(langCode)
+        val environment = AppEnvironmentManager(this).currentSnapshot()
+        val locale = LocaleResolver.resolveLocale(environment)
         Locale.setDefault(locale)
 
         val configuration = Configuration(resources.configuration)
@@ -106,16 +117,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun attachBaseContext(newBase: Context) {
-        val config = Config.getInstance(newBase)
-        val langCode = config.getLanguage()
-        val locale = Locale(langCode)
-        Locale.setDefault(locale)
-
-        val configuration = Configuration(newBase.resources.configuration)
-        configuration.setLocale(locale)
-        val context = newBase.createConfigurationContext(configuration)
-
-        super.attachBaseContext(context)
+        val environment = AppEnvironmentManager(newBase).currentSnapshot()
+        super.attachBaseContext(LocaleResolver.wrapContext(newBase, environment))
     }
 
     override fun onResume() {

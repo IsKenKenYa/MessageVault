@@ -1,20 +1,27 @@
 package imken.messagevault.mobile.data.backup
 
 import android.content.Context
+import android.content.ContentResolver
+import android.content.pm.PackageManager
 import android.provider.Telephony
 import imken.messagevault.mobile.utils.PhoneNumberUtils
 import imken.messagevault.sdk.backup.model.Message
 import imken.messagevault.sdk.backup.reader.SmsReader
 import timber.log.Timber
 
-class AndroidSmsReader(private val context: Context) : SmsReader {
+class AndroidSmsReader(
+    private val context: Context,
+    private val contentResolver: ContentResolver = context.contentResolver,
+    private val hasPermission: (String) -> Boolean = { permission ->
+        context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }
+) : SmsReader {
 
     override suspend fun readSms(): List<Message>? {
         val messages = mutableListOf<Message>()
 
         try {
-            val permissionStatus = context.checkSelfPermission(android.Manifest.permission.READ_SMS)
-            if (permissionStatus != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (!hasPermission(android.Manifest.permission.READ_SMS)) {
                 Timber.e("[Mobile] ERROR [Backup] 备份短信失败: 没有 READ_SMS 权限")
                 return null
             }
@@ -33,7 +40,7 @@ class AndroidSmsReader(private val context: Context) : SmsReader {
             )
             val sortOrder = "${Telephony.Sms.DATE} DESC"
 
-            context.contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+            contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
                 Timber.d("[Mobile] DEBUG [Backup] 找到 ${cursor.count} 条短信")
 
                 val idColumn = cursor.getColumnIndex(Telephony.Sms._ID)

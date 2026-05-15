@@ -17,6 +17,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import imken.messagevault.mobile.R
 import imken.messagevault.mobile.ui.theme.MessageVaultTheme
+import imken.messagevault.mobile.ui.model.UiText
+import imken.messagevault.mobile.ui.model.resolve
 
 /**
  * 备份屏幕
@@ -32,7 +34,7 @@ import imken.messagevault.mobile.ui.theme.MessageVaultTheme
 fun BackupScreen(
     permissionsGranted: Boolean,
     isOperating: Boolean,
-    backupStatus: String?,
+    backupStatus: UiText?,
     onBackupClick: () -> Unit
 ) {
     Column(
@@ -131,9 +133,10 @@ fun PermissionRequiredCard() {
 @Composable
 fun BackupInfoCard(
     isOperating: Boolean,
-    backupStatus: String?,
+    backupStatus: UiText?,
     onBackupClick: () -> Unit
 ) {
+    val status = backupStatus.resolve() ?: stringResource(id = R.string.status_initial)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -146,7 +149,7 @@ fun BackupInfoCard(
         ) {
             // 标题
             Text(
-                text = "数据备份",
+                text = stringResource(R.string.backup_data_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -155,7 +158,7 @@ fun BackupInfoCard(
             
             // 状态信息
             Text(
-                text = backupStatus ?: stringResource(id = R.string.status_initial),
+                text = status,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -212,7 +215,7 @@ fun BackupHelpCard() {
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "关于备份",
+                text = stringResource(R.string.backup_about_title),
                 style = MaterialTheme.typography.titleLarge
             )
             
@@ -220,14 +223,14 @@ fun BackupHelpCard() {
             
             val permissions = remember {
                 listOf(
-                    "读取短信 (${Manifest.permission.READ_SMS})" to "用于备份短信内容",
-                    "读取通话记录 (${Manifest.permission.READ_CALL_LOG})" to "用于备份通话历史",
-                    "存储空间 (${Manifest.permission.WRITE_EXTERNAL_STORAGE})" to "用于保存备份文件"
+                    R.string.permission_sms_backup_title to R.string.permission_sms_backup_body,
+                    R.string.permission_call_backup_title to R.string.permission_call_backup_body,
+                    R.string.permission_contacts_backup_title to R.string.permission_contacts_backup_body
                 )
             }
             
             LazyColumn {
-                items(permissions) { (permission, description) ->
+                items(permissions) { (permissionRes, descriptionRes) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -245,12 +248,12 @@ fun BackupHelpCard() {
                         
                         Column {
                             Text(
-                                text = permission,
+                                text = stringResource(permissionRes),
                                 style = MaterialTheme.typography.titleSmall
                             )
                             
                             Text(
-                                text = description,
+                                text = stringResource(descriptionRes),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -292,7 +295,7 @@ fun BackupScreenPreview() {
         BackupScreen(
             permissionsGranted = true,
             isOperating = false,
-            backupStatus = "上次备份：2023-01-01 12:00",
+            backupStatus = UiText.Dynamic("上次备份：2023-01-01 12:00"),
             onBackupClick = {}
         )
     }

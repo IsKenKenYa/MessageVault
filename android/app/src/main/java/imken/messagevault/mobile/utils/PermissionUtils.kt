@@ -18,8 +18,13 @@ import timber.log.Timber
  */
 object PermissionUtils {
     
-    // 应用所需的基本权限列表
-    private val BASIC_PERMISSIONS = arrayOf(
+    val BACKUP_PERMISSIONS = arrayOf(
+        Manifest.permission.READ_SMS,
+        Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.READ_CONTACTS
+    )
+
+    val RESTORE_PERMISSIONS = arrayOf(
         Manifest.permission.READ_SMS,
         Manifest.permission.SEND_SMS,
         Manifest.permission.RECEIVE_SMS,
@@ -28,6 +33,9 @@ object PermissionUtils {
         Manifest.permission.READ_CONTACTS,
         Manifest.permission.WRITE_CONTACTS
     )
+
+    // 应用所需的基本权限列表
+    private val BASIC_PERMISSIONS = BACKUP_PERMISSIONS
     
     // Android 11+上需要特殊处理的权限
     private val ANDROID_11_SPECIAL_PERMISSIONS = arrayOf(
@@ -57,6 +65,18 @@ object PermissionUtils {
     fun getNotGrantedPermissions(context: Context): List<String> {
         return BASIC_PERMISSIONS.filter {
             context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    fun checkBackupPermissions(context: Context): Boolean {
+        return BACKUP_PERMISSIONS.all {
+            context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    fun checkRestorePermissions(context: Context): Boolean {
+        return RESTORE_PERMISSIONS.all {
+            context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
         }
     }
     

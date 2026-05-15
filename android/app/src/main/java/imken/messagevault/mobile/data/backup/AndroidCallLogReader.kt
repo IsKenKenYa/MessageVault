@@ -1,20 +1,27 @@
 package imken.messagevault.mobile.data.backup
 
 import android.content.Context
+import android.content.ContentResolver
+import android.content.pm.PackageManager
 import android.provider.CallLog.Calls
 import imken.messagevault.mobile.utils.PhoneNumberUtils
 import imken.messagevault.sdk.backup.model.CallLog
 import imken.messagevault.sdk.backup.reader.CallLogReader
 import timber.log.Timber
 
-class AndroidCallLogReader(private val context: Context) : CallLogReader {
+class AndroidCallLogReader(
+    private val context: Context,
+    private val contentResolver: ContentResolver = context.contentResolver,
+    private val hasPermission: (String) -> Boolean = { permission ->
+        context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }
+) : CallLogReader {
 
     override suspend fun readCallLogs(): List<CallLog>? {
         val callLogs = mutableListOf<CallLog>()
 
         try {
-            val permissionStatus = context.checkSelfPermission(android.Manifest.permission.READ_CALL_LOG)
-            if (permissionStatus != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (!hasPermission(android.Manifest.permission.READ_CALL_LOG)) {
                 Timber.e("[Mobile] ERROR [Backup] 备份通话记录失败: 没有 READ_CALL_LOG 权限")
                 return null
             }
@@ -42,7 +49,7 @@ class AndroidCallLogReader(private val context: Context) : CallLogReader {
                 Timber.d("[Mobile] DEBUG [Backup] 查询时间范围: ${range.first} 到 ${range.second}")
 
                 try {
-                    context.contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+                    contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
                         totalCallLogs += cursor.count
 
                         val idColumn = cursor.getColumnIndex(Calls._ID)

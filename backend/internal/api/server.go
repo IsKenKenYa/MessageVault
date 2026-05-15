@@ -22,13 +22,13 @@ import (
 const refreshCookieName = "commory_refresh_token"
 
 type Server struct {
-	cfg        config.Config
-	store      storage.Provider
-	service    query.Service
-	auth       *auth.Service
-	validator  *msglayer.Validator
-	importer   importers.Importer
-	setupSvc   *setup.Service
+	cfg       config.Config
+	store     storage.Provider
+	service   query.Service
+	auth      *auth.Service
+	validator *msglayer.Validator
+	importer  importers.Importer
+	setupSvc  *setup.Service
 }
 
 func NewServer(cfg config.Config, store storage.Provider, validator *msglayer.Validator) *Server {
@@ -71,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 
 	root := http.NewServeMux()
 	root.Handle("/api/auth/", publicMux)
+	root.Handle("/api/setup", publicMux)
 	root.Handle("/api/", auth.Middleware(s.auth, privateMux))
 	return root
 }

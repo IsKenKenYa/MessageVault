@@ -18,7 +18,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.ArgumentMatchers.isNull
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
@@ -52,11 +53,8 @@ class BackupManagerTest {
         MockitoAnnotations.openMocks(this)
         setupTestLogger()
         
-        `when`(mockContext.contentResolver).thenReturn(mockResolver)
-        `when`(mockContext.checkSelfPermission(anyString())).thenReturn(android.content.pm.PackageManager.PERMISSION_GRANTED)
-        
-        smsReader = AndroidSmsReader(mockContext)
-        callLogReader = AndroidCallLogReader(mockContext)
+        smsReader = AndroidSmsReader(mockContext, mockResolver) { true }
+        callLogReader = AndroidCallLogReader(mockContext, mockResolver) { true }
         
         Timber.i("[Mobile] INFO [Test] 开始测试BackupManager; Context: Unit test initialization")
     }
@@ -79,9 +77,9 @@ class BackupManagerTest {
         val mockSmsCursor = createMockSmsCursor()
         `when`(mockResolver.query(
             eq(Telephony.Sms.CONTENT_URI),
-            isNull(),
-            isNull(),
-            isNull(),
+            any<Array<String>>(),
+            any(),
+            any(),
             anyString()
         )).thenReturn(mockSmsCursor)
         
@@ -101,9 +99,9 @@ class BackupManagerTest {
         val mockCallLogCursor = createMockCallLogCursor()
         `when`(mockResolver.query(
             eq(Calls.CONTENT_URI),
-            isNull(),
-            isNull(),
-            isNull(),
+            any<Array<String>>(),
+            anyString(),
+            any<Array<String>>(),
             anyString()
         )).thenReturn(mockCallLogCursor)
         

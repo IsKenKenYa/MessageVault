@@ -3,11 +3,11 @@ package imken.messagevault.mobile.ui.viewmodels
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
-import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import imken.messagevault.mobile.R
 import imken.messagevault.mobile.data.backup.AndroidBackupFileReader
 import imken.messagevault.mobile.data.backup.AndroidBackupFileWriter
 import imken.messagevault.mobile.data.backup.AndroidCallLogReader
@@ -17,6 +17,11 @@ import imken.messagevault.mobile.data.backup.AndroidContactWriter
 import imken.messagevault.mobile.data.backup.AndroidSmsReader
 import imken.messagevault.mobile.data.backup.AndroidSmsWriter
 import imken.messagevault.mobile.BuildConfig
+import imken.messagevault.mobile.di.AppContainer
+import imken.messagevault.mobile.remote.CommoryServerClient
+import imken.messagevault.mobile.runtime.AppEnvironmentManager
+import imken.messagevault.mobile.runtime.RuntimeModePolicy
+import imken.messagevault.mobile.ui.model.UiText
 import imken.messagevault.sdk.backup.BackupManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +34,8 @@ import timber.log.Timber
 class BackupViewModel(
     private val backupManager: BackupManager,
     private val deviceIdProvider: () -> String,
+    private val environmentManager: AppEnvironmentManager? = null,
+    private val serverClient: CommoryServerClient? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
@@ -38,11 +45,11 @@ class BackupViewModel(
     
     private val _isOperating = mutableStateOf(false)
     
-    private val _backupStatus = mutableStateOf<String?>(null)
+    private val _backupStatus = mutableStateOf<UiText?>(null)
     
     fun getPermissionsGranted(): Boolean = _permissionsGranted.value
     fun isOperating(): Boolean = _isOperating.value
-    fun getBackupStatus(): String? = _backupStatus.value
+    fun getBackupStatus(): UiText? = _backupStatus.value
     
     fun setPermissionsGranted(granted: Boolean) {
         _permissionsGranted.value = granted
@@ -50,7 +57,7 @@ class BackupViewModel(
     
     fun startBackup() {
         if (!_permissionsGranted.value) {
-            _backupStatus.value = "权限不足，无法执行备份"
+            _backupStatus.value = UiText.Resource(R.string.backup_error_permissions)
             return
         }
         
@@ -60,11 +67,12 @@ class BackupViewModel(
         }
         
         _isOperating.value = true
-        _backupStatus.value = "正在准备备份..."
+        _backupStatus.value = UiText.Resource(R.string.backup_status_preparing)
         
         viewModelScope.launch(dispatcher) {
             try {
                 val deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL}"
+                val environment = environmentManager?.currentSnapshot()
                 val result = backupManager.performBackup(
                     hasSmsPermission = true,
                     hasCallLogPermission = true,
@@ -74,13 +82,45 @@ class BackupViewModel(
                     appVersion = BuildConfig.VERSION_NAME
                 )
                 if (result.success) {
-                    _backupStatus.value = "备份完成: ${result.smsCount} 条短信, ${result.callLogCount} 条通话记录"
+                    var remoteUploaded = false
+                    val accessToken = environment?.authSession?.accessToken
+                    val filePath = result.filePath
+                    if (environment != null &&
+                        RuntimeModePolicy.canUploadBackup(environment) &&
+                        accessToken != null &&
+                        filePath != null &&
+                        serverClient != null
+                    ) {
+                        _backupStatus.value = UiText.Resource(R.string.backup_status_uploading)
+                        remoteUploaded = serverClient.uploadImport(
+                            baseUrl = environment.serverUrl,
+                            accessToken = accessToken,
+                            file = java.io.File(filePath)
+                        ).isSuccess
+                    }
+                    _backupStatus.value = if (remoteUploaded) {
+                        UiText.Resource(
+                            R.string.backup_success_remote,
+                            listOf(result.smsCount, result.callLogCount)
+                        )
+                    } else {
+                        UiText.Resource(
+                            R.string.backup_success_local,
+                            listOf(result.smsCount, result.callLogCount)
+                        )
+                    }
                 } else {
-                    _backupStatus.value = "备份失败: ${result.errorMessage}"
+                    _backupStatus.value = UiText.Resource(
+                        R.string.backup_failed_with_reason,
+                        listOf(result.errorMessage.orEmpty())
+                    )
                 }
             } catch (e: Exception) {
                 Timber.e(e, "[Mobile] ERROR [Backup] 备份失败")
-                _backupStatus.value = "备份失败: ${e.message}"
+                _backupStatus.value = UiText.Resource(
+                    R.string.backup_failed_with_reason,
+                    listOf(e.message.orEmpty())
+                )
             } finally {
                 _isOperating.value = false
             }
@@ -109,6 +149,29 @@ class BackupViewModel(
                             Settings.Secure.ANDROID_ID
                         ) ?: "unknown-device"
                     }
+                ) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
+
+    class ContainerFactory(
+        private val context: Context,
+        private val container: AppContainer
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(BackupViewModel::class.java)) {
+                return BackupViewModel(
+                    backupManager = container.createBackupManager(),
+                    deviceIdProvider = {
+                        Settings.Secure.getString(
+                            context.contentResolver,
+                            Settings.Secure.ANDROID_ID
+                        ) ?: "unknown-device"
+                    },
+                    environmentManager = container.environmentManager,
+                    serverClient = container.serverClient
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")

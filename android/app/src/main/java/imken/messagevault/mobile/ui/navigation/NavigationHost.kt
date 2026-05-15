@@ -27,10 +27,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import imken.messagevault.mobile.R
+import imken.messagevault.mobile.runtime.RuntimeMode
+import imken.messagevault.mobile.runtime.RuntimeModePolicy
 import imken.messagevault.mobile.ui.screens.BackupScreen
 import imken.messagevault.mobile.ui.screens.MoreScreen
+import imken.messagevault.mobile.ui.screens.ModeSelectionScreen
 import imken.messagevault.mobile.ui.screens.PreviewScreen
 import imken.messagevault.mobile.ui.screens.RestoreScreen
+import imken.messagevault.mobile.ui.screens.ServerSetupScreen
+import imken.messagevault.mobile.ui.viewmodels.AppViewModel
 import imken.messagevault.mobile.ui.viewmodels.BackupViewModel
 import imken.messagevault.mobile.ui.viewmodels.RestoreViewModel
 
@@ -51,11 +56,32 @@ val navigationItems = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageVaultAppWithNavigation(
+    appViewModel: AppViewModel,
     backupViewModel: BackupViewModel,
     restoreViewModel: RestoreViewModel,
     navigationItems: List<NavigationItem>
 ) {
     val navController = rememberNavController()
+    val environment by appViewModel.environment.collectAsState()
+    val serverAuthState by appViewModel.serverAuthState.collectAsState()
+
+    if (!environment.modeSelected) {
+        ModeSelectionScreen(onSelectMode = appViewModel::selectMode)
+        return
+    }
+
+    if (RuntimeModePolicy.requiresServerAuth(environment)) {
+        ServerSetupScreen(
+            environment = environment,
+            authState = serverAuthState,
+            onServerUrlChange = appViewModel::updateServerUrl,
+            onCheckServer = { appViewModel.checkServer() },
+            onLogin = appViewModel::login,
+            onRegister = appViewModel::register,
+            onUseLocal = { appViewModel.selectMode(RuntimeMode.LOCAL_ONLY) }
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -128,6 +154,16 @@ fun MessageVaultAppWithNavigation(
             }
             composable(NavigationItem.More.route) {
                 MoreScreen(
+                    environment = environment,
+                    serverAuthState = serverAuthState,
+                    onModeChange = appViewModel::selectMode,
+                    onLocaleChange = appViewModel::updateLocale,
+                    onSyncOnBackupChange = appViewModel::updateSyncOnBackup,
+                    onServerUrlChange = appViewModel::updateServerUrl,
+                    onCheckServer = { appViewModel.checkServer() },
+                    onLogin = appViewModel::login,
+                    onRegister = appViewModel::register,
+                    onLogout = appViewModel::logout,
                     onNavigateToRestore = {
                         navController.navigate(NavigationItem.Restore.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
