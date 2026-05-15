@@ -53,6 +53,8 @@ Thumbs.db
 *.tar.gz
 *.rar
 
+.jdks/
+
 # Java heap dump files
 *.hprof
 java_pid*.hprof

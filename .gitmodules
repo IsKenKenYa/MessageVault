@@ -2,3 +2,6 @@
 	path = references/art-design-pro
 	url = https://github.com/Daymychen/art-design-pro.git
 	branch = main
+[submodule "references/new-api"]
+	path = references/new-api
+	url = https://github.com/QuantumNous/new-api.git

@@ -20,13 +20,21 @@
     }
   },
   "refresh_tokens": {
+    "refresh_b53c202aa00443b0": {
+      "id": "refresh_b53c202aa00443b0",
+      "user_id": "user_f1fb3d28941df6c2",
+      "token_hash": "a1d246d7f2811b1fff4e5260538e2da945dfaded273c0cb78ec7fbbfc42324c2",
+      "expires_at": "2026-05-21T16:56:09.114195Z",
+      "created_at": "2026-05-14T16:56:09.114195Z",
+      "revoked_at": "0001-01-01T00:00:00Z"
+    },
     "refresh_b94f4de6e84aaf37": {
       "id": "refresh_b94f4de6e84aaf37",
       "user_id": "user_f1fb3d28941df6c2",
       "token_hash": "e18cce180af79654de9b98faa9305cab4e06a7dd1b6af423183db1d48ecccb36",
       "expires_at": "2026-05-21T13:47:29.453101Z",
       "created_at": "2026-05-14T13:47:29.453101Z",
-      "revoked_at": "0001-01-01T00:00:00Z"
+      "revoked_at": "2026-05-14T16:56:09.106114Z"
     }
   },
   "imports": {

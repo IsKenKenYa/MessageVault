@@ -84,7 +84,7 @@ class Config(private val context: Context) {
     fun getAppVersion(): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            packageInfo.versionName
+            packageInfo.versionName ?: "未知版本"
         } catch (e: Exception) {
             Timber.e(e, "[Mobile] ERROR [Config] 获取应用版本失败")
             "未知版本"

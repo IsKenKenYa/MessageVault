@@ -1,27 +1,17 @@
-// 项目级build.gradle
-
-buildscript {
-    ext {
-        compose_compiler_version = '1.5.6'
-        kotlin_version = '1.9.21'
-        room_version = '2.6.1'
-        coroutines_version = '1.7.3'
-        gson_version = '2.10.1'
-        retrofit_version = '2.9.0'
-    }
-
-    repositories {
-        google()
-        mavenCentral()
-    }
-    
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.4'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
+plugins {
+    id 'com.android.application' version '9.0.0' apply false
+    id 'com.android.library' version '9.0.0' apply false
+    id 'org.jetbrains.kotlin.android' version '2.2.0' apply false
+    id 'org.jetbrains.kotlin.jvm' version '2.2.0' apply false
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.2.0' apply false
 }
 
-// 删除 allprojects 块，依赖仓库已经在 settings.gradle 中配置
+ext {
+    room_version = '2.7.1'
+    coroutines_version = '1.10.2'
+    gson_version = '2.13.1'
+    retrofit_version = '2.11.0'
+}
 
 tasks.register('clean', Delete) {
     delete rootProject.buildDir

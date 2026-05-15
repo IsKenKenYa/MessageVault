@@ -199,6 +199,8 @@ class MsgLayerMapper {
         else -> "unknown"
     }
 
+    private fun selfIdentityId(deviceId: String): String = "self/$deviceId"
+
     private fun normalizePhone(raw: String?): String {
         if (raw.isNullOrBlank()) return ""
         val cleaned = raw.filter { it.isDigit() || it == '+' }

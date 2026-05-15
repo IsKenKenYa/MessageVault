@@ -14,7 +14,7 @@ object AppUtils {
     fun getAppVersion(context: Context): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            packageInfo.versionName
+            packageInfo.versionName ?: "未知版本"
         } catch (e: PackageManager.NameNotFoundException) {
             "未知版本"
         }

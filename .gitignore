@@ -43,3 +43,4 @@ coverage/
 # Trae
 .trae/
 .playwright-mcp/
+backend/data/
