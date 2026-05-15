@@ -52,6 +52,47 @@ func (s *Service) Register(ctx context.Context, userName, email, password string
 		return UserInfo{}, TokenPair{}, err
 	}
 
+	roles := []string{"R_USER"}
+	buttons := []string{"view", "import"}
+
+	now := time.Now().UTC()
+	record, err := s.store.CreateUser(ctx, storage.UserRecord{
+		ID:           randomID("user"),
+		UserName:     userName,
+		Email:        strings.TrimSpace(email),
+		PasswordHash: hashed,
+		PasswordSalt: salt,
+		Roles:        roles,
+		Buttons:      buttons,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		return UserInfo{}, TokenPair{}, err
+	}
+
+	pair, err := s.issueTokenPair(ctx, record)
+	if err != nil {
+		return UserInfo{}, TokenPair{}, err
+	}
+	return toUserInfo(record), pair, nil
+}
+
+func (s *Service) RegisterAdmin(ctx context.Context, userName, email, password string) (UserInfo, TokenPair, error) {
+	userName = strings.TrimSpace(userName)
+	if userName == "" || strings.TrimSpace(password) == "" {
+		return UserInfo{}, TokenPair{}, fmt.Errorf("username and password are required")
+	}
+
+	if _, err := s.store.FindUserByUserName(ctx, userName); err == nil {
+		return UserInfo{}, TokenPair{}, fmt.Errorf("username already exists")
+	}
+
+	salt, hashed, err := hashPassword(password)
+	if err != nil {
+		return UserInfo{}, TokenPair{}, err
+	}
+
 	roles := []string{"R_ADMIN", "R_USER"}
 	buttons := []string{"view", "import", "admin"}
 
@@ -91,6 +132,12 @@ func (s *Service) Login(ctx context.Context, remoteAddr, userName, password stri
 		return UserInfo{}, TokenPair{}, fmt.Errorf("invalid username or password")
 	}
 
+	if NeedsRehash(record.PasswordHash) {
+		if _, newHash, rehashErr := hashPassword(password); rehashErr == nil {
+			_ = s.store.UpdateUserPasswordHash(ctx, record.ID, newHash)
+		}
+	}
+
 	pair, err := s.issueTokenPair(ctx, record)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
@@ -112,6 +159,14 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 		return TokenPair{}, err
 	}
 	return s.issueTokenPair(ctx, user)
+}
+
+func (s *Service) RevokeRefreshToken(ctx context.Context, refreshToken string) error {
+	if refreshToken == "" {
+		return nil
+	}
+	_, err := s.store.ConsumeRefreshToken(ctx, hashToken(refreshToken))
+	return err
 }
 
 func (s *Service) UserInfo(ctx context.Context, userID string) (UserInfo, error) {
@@ -233,16 +288,44 @@ func hashPassword(password string) (salt string, hash string, err error) {
 		return "", "", err
 	}
 	salt = hex.EncodeToString(rawSalt)
-	sum := derivePassword(password, salt)
-	return salt, hex.EncodeToString(sum[:]), nil
+	sum := derivePasswordPBKDF2(password, salt, 120000)
+	return salt, "pbkdf2$" + hex.EncodeToString(sum[:]), nil
 }
 
 func verifyPassword(password, salt, expected string) bool {
-	sum := derivePassword(password, salt)
-	return hmac.Equal([]byte(hex.EncodeToString(sum[:])), []byte(expected))
+	var sum [32]byte
+	if strings.HasPrefix(expected, "pbkdf2$") {
+		sum = derivePasswordPBKDF2(password, salt, 120000)
+		return hmac.Equal([]byte("pbkdf2$"+hex.EncodeToString(sum[:])), []byte(expected))
+	}
+	stripped := strings.TrimPrefix(expected, "sha256$")
+	sum = derivePasswordLegacy(password, salt)
+	return hmac.Equal([]byte(hex.EncodeToString(sum[:])), []byte(stripped))
 }
 
-func derivePassword(password, salt string) [32]byte {
+func NeedsRehash(hash string) bool {
+	return !strings.HasPrefix(hash, "pbkdf2$")
+}
+
+func derivePasswordPBKDF2(password, salt string, iterations int) [32]byte {
+	prf := hmac.New(sha256.New, []byte(password))
+	var result [32]byte
+	prf.Write([]byte(salt))
+	prf.Write([]byte{0, 0, 0, 1})
+	u := prf.Sum(nil)
+	copy(result[:], u)
+	for i := 1; i < iterations; i++ {
+		prf.Reset()
+		prf.Write(u)
+		u = prf.Sum(nil)
+		for j := 0; j < 32; j++ {
+			result[j] ^= u[j]
+		}
+	}
+	return result
+}
+
+func derivePasswordLegacy(password, salt string) [32]byte {
 	input := []byte(password + ":" + salt)
 	sum := sha256.Sum256(input)
 	for i := 0; i < 120000; i++ {

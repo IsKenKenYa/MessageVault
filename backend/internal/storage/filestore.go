@@ -21,6 +21,7 @@ type storeSnapshot struct {
 	Imports       map[string]storedImport       `json:"imports"`
 	Identities    map[string]storedIdentity     `json:"identities"`
 	Events        map[string]storedEvent        `json:"events"`
+	Setup         *SetupRecord                  `json:"setup,omitempty"`
 }
 
 type storedImport struct {
@@ -200,8 +201,8 @@ func (s *fileStore) GetEvent(ctx context.Context, userID, id string) (msglayer.T
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	item, ok := s.snapshot.Events[scopeKey(userID, id)]
-	if !ok || item.UserID != userID {
+	item, ok := s.lookupScopedEventKey(s.snapshot.Events, userID, id)
+	if !ok {
 		return msglayer.TimelineItem{}, fmt.Errorf("event not found: %s", id)
 	}
 	return item.Item, nil
@@ -254,6 +255,11 @@ func (s *fileStore) filterEvents(ctx context.Context, params msglayer.SearchPara
 		items = append(items, stored.Item)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Timestamp > items[j].Timestamp })
+	if params.Offset > 0 && params.Offset < len(items) {
+		items = items[params.Offset:]
+	} else if params.Offset >= len(items) {
+		items = nil
+	}
 	if params.Limit > 0 && len(items) > params.Limit {
 		items = items[:params.Limit]
 	}
@@ -279,8 +285,8 @@ func (s *fileStore) GetIdentity(ctx context.Context, userID, id string) (msglaye
 	_ = ctx
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	identity, ok := s.snapshot.Identities[scopeKey(userID, id)]
-	if !ok || identity.UserID != userID {
+	identity, ok := s.lookupScopedKey(s.snapshot.Identities, userID, id)
+	if !ok {
 		return msglayer.Identity{}, fmt.Errorf("identity not found: %s", id)
 	}
 	return identity.Identity, nil
@@ -374,6 +380,57 @@ func (s *fileStore) ConsumeRefreshToken(ctx context.Context, tokenHash string) (
 	return RefreshTokenRecord{}, fmt.Errorf("refresh token not found")
 }
 
+func (s *fileStore) GetSetupStatus(ctx context.Context) (SetupStatus, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.snapshot.Setup != nil {
+		return SetupStatus{Initialized: true, Version: s.snapshot.Setup.Version, DatabaseType: "sqlite"}, nil
+	}
+	hasAdmin, _ := s.hasAdminUserLocked()
+	return SetupStatus{Initialized: hasAdmin, DatabaseType: "sqlite"}, nil
+}
+
+func (s *fileStore) SaveSetup(ctx context.Context, setup SetupRecord) error {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.Setup = &setup
+	return s.persist()
+}
+
+func (s *fileStore) HasAdminUser(ctx context.Context) (bool, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.hasAdminUserLocked()
+}
+
+func (s *fileStore) hasAdminUserLocked() (bool, error) {
+	for _, user := range s.snapshot.Users {
+		for _, role := range user.Roles {
+			if role == "R_ADMIN" || role == "R_SUPER" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func (s *fileStore) UpdateUserPasswordHash(ctx context.Context, userID, newHash string) error {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.snapshot.Users[userID]
+	if !ok {
+		return fmt.Errorf("user not found")
+	}
+	user.PasswordHash = newHash
+	user.UpdatedAt = time.Now().UTC()
+	s.snapshot.Users[userID] = user
+	return s.persist()
+}
+
 func EnsureParentDir(path string) error {
 	dir := filepath.Dir(path)
 	if dir == "." || dir == "" {
@@ -392,7 +449,36 @@ func (s *fileStore) persist() error {
 
 func scopeKey(userID, rawID string) string {
 	hash := sha1.Sum([]byte(userID))
+	return fmt.Sprintf("%x:%s", hash[:8], rawID)
+}
+
+func scopeKeyLegacy(userID, rawID string) string {
+	hash := sha1.Sum([]byte(userID))
 	return fmt.Sprintf("%x:%s", hash[:4], rawID)
+}
+
+func (s *fileStore) lookupScopedKey(m map[string]storedIdentity, userID, rawID string) (storedIdentity, bool) {
+	key := scopeKey(userID, rawID)
+	if v, ok := m[key]; ok && v.UserID == userID {
+		return v, true
+	}
+	key = scopeKeyLegacy(userID, rawID)
+	if v, ok := m[key]; ok && v.UserID == userID {
+		return v, true
+	}
+	return storedIdentity{}, false
+}
+
+func (s *fileStore) lookupScopedEventKey(m map[string]storedEvent, userID, rawID string) (storedEvent, bool) {
+	key := scopeKey(userID, rawID)
+	if v, ok := m[key]; ok && v.UserID == userID {
+		return v, true
+	}
+	key = scopeKeyLegacy(userID, rawID)
+	if v, ok := m[key]; ok && v.UserID == userID {
+		return v, true
+	}
+	return storedEvent{}, false
 }
 
 func summarizeEvent(event msglayer.Event) string {

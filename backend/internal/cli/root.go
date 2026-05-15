@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/IsKenKenYa/Commory/backend/internal/api"
@@ -14,6 +16,7 @@ import (
 	"github.com/IsKenKenYa/Commory/backend/internal/importers"
 	"github.com/IsKenKenYa/Commory/backend/internal/msglayer"
 	"github.com/IsKenKenYa/Commory/backend/internal/query"
+	"github.com/IsKenKenYa/Commory/backend/internal/setup"
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
 )
 
@@ -212,6 +215,12 @@ func boot(ctx context.Context) (config.Config, storage.Provider, *msglayer.Valid
 	if err != nil {
 		return config.Config{}, nil, nil, err
 	}
+	if cfg.IsDefaultAuthSecret() {
+		if strings.EqualFold(cfg.Env, "production") {
+			return config.Config{}, nil, nil, fmt.Errorf("FATAL: COMMORY_AUTH_SECRET is using the default value. Set a secure secret before running in production mode")
+		}
+		fmt.Fprintln(os.Stderr, "WARNING: COMMORY_AUTH_SECRET is using the default value. This is insecure for production use.")
+	}
 	validator, err := msglayer.NewValidator(cfg.SchemaRoot)
 	if err != nil {
 		return config.Config{}, nil, nil, err
@@ -223,6 +232,7 @@ func boot(ctx context.Context) (config.Config, storage.Provider, *msglayer.Valid
 	if err := store.Init(ctx); err != nil {
 		return config.Config{}, nil, nil, err
 	}
+	setup.CheckSetup(ctx, store)
 	return cfg, store, validator, nil
 }
 

@@ -14,6 +14,32 @@ func NewValidator(rootSchemaPath string) (*Validator, error) {
 	return &Validator{rootSchemaPath: rootSchemaPath}, nil
 }
 
+var allowedIdentityFields = map[string]bool{
+	"id": true, "type": true, "display_name": true,
+	"avatar": true, "phones": true, "emails": true, "labels": true, "meta": true,
+}
+
+var allowedEventFields = map[string]bool{
+	"id": true, "timestamp": true, "type": true, "direction": true,
+	"participants": true, "content": true, "relations": true, "meta": true,
+}
+
+var allowedContentKeys = map[string]map[string]bool{
+	"sms":              {"text": true, "attachments": true},
+	"call":             {"duration_sec": true, "call_type": true, "recording": true},
+	"voice":            {"file": true, "transcript": true, "summary": true},
+	"contact_snapshot": {"identity_id": true, "snapshot": true},
+}
+
+func checkAdditionalProperties(obj map[string]any, allowed map[string]bool, context string) error {
+	for key := range obj {
+		if !allowed[key] {
+			return fmt.Errorf("schema validation failed: unknown %s field %q", context, key)
+		}
+	}
+	return nil
+}
+
 func (v *Validator) ValidateBytes(data []byte) error {
 	var payload RootExport
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -28,7 +54,12 @@ func (v *Validator) ValidateBytes(data []byte) error {
 	if payload.Source.Platform == "" || payload.Source.DeviceID == "" || payload.Source.AppVersion == "" {
 		return fmt.Errorf("schema validation failed: source.platform, source.device_id, and source.app_version are required")
 	}
-	for _, identity := range payload.Identities {
+	var rawPayload struct {
+		Identities []map[string]any `json:"identities"`
+		Events     []map[string]any `json:"events"`
+	}
+	_ = json.Unmarshal(data, &rawPayload)
+	for i, identity := range payload.Identities {
 		if identity.ID == "" || identity.Type == "" || identity.DisplayName == "" {
 			return fmt.Errorf("schema validation failed: identity id/type/display_name required")
 		}
@@ -40,8 +71,13 @@ func (v *Validator) ValidateBytes(data []byte) error {
 		default:
 			return fmt.Errorf("schema validation failed: unsupported identity type %q", identity.Type)
 		}
+		if i < len(rawPayload.Identities) {
+			if err := checkAdditionalProperties(rawPayload.Identities[i], allowedIdentityFields, "identity"); err != nil {
+				return err
+			}
+		}
 	}
-	for _, event := range payload.Events {
+	for i, event := range payload.Events {
 		if event.ID == "" || event.Timestamp == "" || event.Type == "" {
 			return fmt.Errorf("schema validation failed: event id/type/timestamp required")
 		}
@@ -92,8 +128,19 @@ func (v *Validator) ValidateBytes(data []byte) error {
 				return fmt.Errorf("schema validation failed: unsupported relation type %q", relation.Type)
 			}
 		}
+		if i < len(rawPayload.Events) {
+			if err := checkAdditionalProperties(rawPayload.Events[i], allowedEventFields, "event"); err != nil {
+				return err
+			}
+			if content, ok := rawPayload.Events[i]["content"].(map[string]any); ok {
+				if allowed, ok := allowedContentKeys[event.Type]; ok {
+					if err := checkAdditionalProperties(content, allowed, "event content"); err != nil {
+						return err
+					}
+				}
+			}
+		}
 	}
-	// TODO: additionalProperties parity still relies on the JSON Schema files until a full schema engine is introduced.
 	return nil
 }
 

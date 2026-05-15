@@ -142,6 +142,22 @@ declare namespace Api {
       from?: string
       to?: string
       limit?: number
+      offset?: number
+    }
+  }
+
+  namespace Setup {
+    interface SetupStatus {
+      status: boolean
+      database_type: string
+      root_init: boolean
+    }
+
+    interface SetupRequest {
+      userName: string
+      password: string
+      confirmPassword: string
+      usageMode: string
     }
   }
 

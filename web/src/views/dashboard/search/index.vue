@@ -20,6 +20,15 @@
           <p class="participants">{{ item.participants.join(', ') }}</p>
         </article>
       </div>
+      <div class="pagination-wrapper" v-if="results.length > 0">
+        <ElPagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="handlePageChange"
+        />
+      </div>
     </section>
   </div>
 </template>
@@ -32,14 +41,24 @@
   const query = ref('')
   const loading = ref(false)
   const results = ref<Api.Commory.TimelineItem[]>([])
+  const currentPage = ref(1)
+  const pageSize = 20
+  const total = ref(0)
 
   const load = async () => {
     loading.value = true
     try {
-      results.value = await fetchSearch({ q: query.value, limit: 100 })
+      const offset = (currentPage.value - 1) * pageSize
+      results.value = await fetchSearch({ q: query.value, limit: pageSize, offset })
+      total.value = results.value.length === pageSize ? (currentPage.value * pageSize + pageSize) : (offset + results.value.length)
     } finally {
       loading.value = false
     }
+  }
+
+  const handlePageChange = (page: number) => {
+    currentPage.value = page
+    load()
   }
 </script>
 
@@ -95,5 +114,11 @@
   .participants,
   .panel-header span {
     color: var(--art-gray-600);
+  }
+
+  .pagination-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
   }
 </style>

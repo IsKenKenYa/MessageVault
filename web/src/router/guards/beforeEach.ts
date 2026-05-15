@@ -49,6 +49,7 @@ import { loadingService } from '@/utils/ui'
 import { useCommon } from '@/hooks/core/useCommon'
 import { useWorktabStore } from '@/store/modules/worktab'
 import { fetchGetUserInfo } from '@/api/auth'
+import { fetchSetupStatus } from '@/api/setup'
 import { ApiStatus } from '@/utils/http/status'
 import { isHttpError } from '@/utils/http/error'
 import { RouteRegistry, MenuProcessor, IframeRouteManager, RoutePermissionValidator } from '../core'
@@ -68,6 +69,8 @@ let routeInitFailed = false
 
 // 路由初始化进行中标记，防止并发请求
 let routeInitInProgress = false
+
+let setupStatusChecked = false
 
 /**
  * 获取 pendingLoading 状态
@@ -149,6 +152,31 @@ async function handleRouteGuard(
   // 启动进度条
   if (settingStore.showNprogress) {
     NProgress.start()
+  }
+
+  if (!setupStatusChecked && to.path !== '/setup') {
+    try {
+      const status = await fetchSetupStatus()
+      if (status && !status.status) {
+        next({ path: '/setup', replace: true })
+        return
+      }
+      setupStatusChecked = true
+    } catch {
+      setupStatusChecked = true
+    }
+  }
+
+  if (to.path === '/setup') {
+    try {
+      const status = await fetchSetupStatus()
+      if (status && status.status) {
+        next({ path: '/', replace: true })
+        return
+      }
+    } catch {
+      // Allow setup to proceed on API error
+    }
   }
 
   // 1. 检查登录状态

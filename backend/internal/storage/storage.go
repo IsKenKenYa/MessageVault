@@ -38,6 +38,19 @@ type ImportSummary struct {
 	IdentityCount int       `json:"identity_count"`
 }
 
+type SetupStatus struct {
+	Initialized  bool   `json:"initialized"`
+	Version      string `json:"version"`
+	DatabaseType string `json:"database_type"`
+}
+
+type SetupRecord struct {
+	ID            string `json:"id"`
+	Version       string `json:"version"`
+	InitializedAt string `json:"initialized_at"`
+	UsageMode     string `json:"usage_mode"`
+}
+
 type Provider interface {
 	Name() string
 	Init(context.Context) error
@@ -57,5 +70,9 @@ type Provider interface {
 	GetUser(context.Context, string) (UserRecord, error)
 	SaveRefreshToken(context.Context, RefreshTokenRecord) error
 	ConsumeRefreshToken(context.Context, string) (RefreshTokenRecord, error)
+	GetSetupStatus(context.Context) (SetupStatus, error)
+	SaveSetup(context.Context, SetupRecord) error
+	HasAdminUser(context.Context) (bool, error)
+	UpdateUserPasswordHash(context.Context, string, string) error
 	Close() error
 }

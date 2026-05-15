@@ -92,6 +92,7 @@
   }
 
   onMounted(load)
+  onActivated(load)
 </script>
 
 <style scoped lang="scss">

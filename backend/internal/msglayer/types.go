@@ -53,6 +53,7 @@ type SearchParams struct {
 	From        string
 	To          string
 	Limit       int
+	Offset      int `json:"offset,omitempty"`
 }
 
 type TimelineItem struct {

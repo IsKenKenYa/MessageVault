@@ -22,6 +22,15 @@
           <template #default="{ row }">{{ row.participants.join(', ') }}</template>
         </ElTableColumn>
       </ElTable>
+      <div class="pagination-wrapper" v-if="items.length > 0">
+        <ElPagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="handlePageChange"
+        />
+      </div>
     </section>
   </div>
 </template>
@@ -33,19 +42,31 @@
 
   const loading = ref(false)
   const items = ref<Api.Commory.TimelineItem[]>([])
+  const currentPage = ref(1)
+  const pageSize = 20
+  const total = ref(0)
   const filters = reactive<Api.Commory.SearchParams>({
     q: '',
     type: '',
-    limit: 200
+    limit: 20
   })
 
   const load = async () => {
     loading.value = true
     try {
+      const offset = (currentPage.value - 1) * pageSize
+      filters.offset = offset
+      filters.limit = pageSize
       items.value = await fetchTimeline(filters)
+      total.value = items.value.length === pageSize ? (currentPage.value * pageSize + pageSize) : (offset + items.value.length)
     } finally {
       loading.value = false
     }
+  }
+
+  const handlePageChange = (page: number) => {
+    currentPage.value = page
+    load()
   }
 
   onMounted(load)
@@ -73,6 +94,12 @@
 
   .panel {
     padding: 18px;
+  }
+
+  .pagination-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
   }
 
   @media (max-width: 900px) {

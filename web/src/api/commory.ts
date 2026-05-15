@@ -1,6 +1,5 @@
 import request from '@/utils/http'
-import axios from 'axios'
-import { useUserStore } from '@/store/modules/user'
+import { axiosInstance } from '@/utils/http'
 
 export function fetchDashboardSummary() {
   return request.get<Api.Commory.DashboardSummary>({
@@ -69,12 +68,8 @@ export function exportImportUrl(importId: string) {
 }
 
 export async function downloadImport(importId: string) {
-  const userStore = useUserStore()
-  const response = await axios.get(exportImportUrl(importId), {
-    responseType: 'blob',
-    headers: {
-      Authorization: `Bearer ${userStore.accessToken}`
-    }
+  const response = await axiosInstance.get(exportImportUrl(importId), {
+    responseType: 'blob'
   })
   const href = URL.createObjectURL(response.data)
   const link = document.createElement('a')

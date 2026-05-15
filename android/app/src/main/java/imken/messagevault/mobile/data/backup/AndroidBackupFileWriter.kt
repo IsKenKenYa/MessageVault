@@ -5,6 +5,7 @@ import android.os.Build
 import imken.messagevault.sdk.backup.model.BackupResult
 import imken.messagevault.sdk.backup.model.BackupWriteStats
 import imken.messagevault.sdk.backup.msglayer.MsgLayerSerializer
+import imken.messagevault.sdk.backup.msglayer.model.MSG_LAYER_VERSION
 import imken.messagevault.sdk.backup.msglayer.model.MsgLayerRootExport
 import imken.messagevault.sdk.backup.writer.BackupFileWriter
 import timber.log.Timber
@@ -88,6 +89,6 @@ class AndroidBackupFileWriter(private val context: Context) : BackupFileWriter {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault())
         val timestamp = dateFormat.format(Date())
         val device = deviceName ?: Build.MODEL.replace(" ", "_")
-        return "msglayer-v0.1_${device}_${timestamp}.json"
+        return "${MSG_LAYER_VERSION.replace("/", "-")}_${device}_${timestamp}.json"
     }
 }

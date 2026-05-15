@@ -204,4 +204,5 @@ const api = {
   }
 }
 
+export { axiosInstance }
 export default api

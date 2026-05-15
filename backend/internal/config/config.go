@@ -13,6 +13,8 @@ type Config struct {
 	ListenAddr       string
 	SchemaRoot       string
 	AuthSecret       string
+	TLS              bool
+	Env              string
 	AllowedImportDir []string
 }
 
@@ -30,6 +32,8 @@ func Load() (Config, error) {
 		ListenAddr:       env("COMMORY_LISTEN_ADDR", ":3000"),
 		SchemaRoot:       schemaRoot,
 		AuthSecret:       env("COMMORY_AUTH_SECRET", "commory-dev-secret"),
+		TLS:              envBool("COMMORY_TLS", false),
+		Env:              env("COMMORY_ENV", "development"),
 		AllowedImportDir: splitAndClean(env("COMMORY_ALLOWED_IMPORT_DIRS", filepath.Join("..", "msglayer", "examples"))),
 	}, nil
 }
@@ -39,6 +43,18 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return strings.EqualFold(value, "true") || value == "1"
+}
+
+func (c Config) IsDefaultAuthSecret() bool {
+	return c.AuthSecret == "commory-dev-secret"
 }
 
 func splitAndClean(raw string) []string {

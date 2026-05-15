@@ -15,6 +15,7 @@ import (
 	"github.com/IsKenKenYa/Commory/backend/internal/importers"
 	"github.com/IsKenKenYa/Commory/backend/internal/msglayer"
 	"github.com/IsKenKenYa/Commory/backend/internal/query"
+	"github.com/IsKenKenYa/Commory/backend/internal/setup"
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
 )
 
@@ -27,16 +28,19 @@ type Server struct {
 	auth       *auth.Service
 	validator  *msglayer.Validator
 	importer   importers.Importer
+	setupSvc   *setup.Service
 }
 
 func NewServer(cfg config.Config, store storage.Provider, validator *msglayer.Validator) *Server {
+	authSvc := auth.NewService(store, cfg.AuthSecret)
 	return &Server{
 		cfg:       cfg,
 		store:     store,
 		service:   query.New(store),
-		auth:      auth.NewService(store, cfg.AuthSecret),
+		auth:      authSvc,
 		validator: validator,
 		importer:  importers.JSONImporter{},
+		setupSvc:  setup.NewService(store, authSvc),
 	}
 }
 
@@ -46,6 +50,7 @@ func (s *Server) Handler() http.Handler {
 	publicMux.HandleFunc("/api/auth/login", s.handleLogin)
 	publicMux.HandleFunc("/api/auth/refresh", s.handleRefresh)
 	publicMux.HandleFunc("/api/auth/logout", s.handleLogout)
+	publicMux.HandleFunc("/api/setup", s.handleSetup)
 
 	privateMux := http.NewServeMux()
 	privateMux.HandleFunc("/api/user/info", s.handleUserInfo)
@@ -89,7 +94,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	setRefreshCookie(w, pair.RefreshToken)
+	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
 	writeJSON(w, http.StatusCreated, "registered", map[string]any{
 		"user":         user,
 		"token":        pair.AccessToken,
@@ -115,7 +120,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
-	setRefreshCookie(w, pair.RefreshToken)
+	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
 	writeJSON(w, http.StatusOK, "ok", map[string]any{
 		"user":         user,
 		"token":        pair.AccessToken,
@@ -143,13 +148,61 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
-	setRefreshCookie(w, pair.RefreshToken)
+	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
 	writeJSON(w, http.StatusOK, "ok", pair)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	clearRefreshCookie(w)
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	refreshToken := req.RefreshToken
+	if refreshToken == "" {
+		if cookie, err := r.Cookie(refreshCookieName); err == nil {
+			refreshToken = cookie.Value
+		}
+	}
+	_ = s.auth.RevokeRefreshToken(r.Context(), refreshToken)
+	clearRefreshCookie(w, s.cfg.TLS)
 	writeJSON(w, http.StatusOK, "logged out", map[string]any{"success": true})
+}
+
+func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleGetSetup(w, r)
+	case http.MethodPost:
+		s.handlePostSetup(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleGetSetup(w http.ResponseWriter, r *http.Request) {
+	status, err := s.setupSvc.GetStatus(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", status)
+}
+
+func (s *Server) handlePostSetup(w http.ResponseWriter, r *http.Request) {
+	var req setup.SetupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.setupSvc.Initialize(r.Context(), req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "initialized", map[string]any{"success": true})
 }
 
 func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +514,9 @@ func buildSearchParams(r *http.Request, userID string) msglayer.SearchParams {
 	if limit := q.Get("limit"); limit != "" {
 		fmt.Sscanf(limit, "%d", &params.Limit)
 	}
+	if offset := q.Get("offset"); offset != "" {
+		fmt.Sscanf(offset, "%d", &params.Offset)
+	}
 	return params
 }
 
@@ -499,24 +555,25 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, msg, nil)
 }
 
-func setRefreshCookie(w http.ResponseWriter, token string) {
+func setRefreshCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   false,
+		Secure:   secure,
 	})
 }
 
-func clearRefreshCookie(w http.ResponseWriter) {
+func clearRefreshCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   secure,
 	})
 }
 
