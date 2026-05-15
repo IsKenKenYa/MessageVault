@@ -1,6 +1,6 @@
-# MsgLayer Indexing Notes
+# MsgLayer 索引说明
 
-`MsgLayer` separates canonical exported data from query-time indexes.
+`MsgLayer` 把 canonical exported data 与查询时索引分开。
 
 ## Canonical Source
 
@@ -8,18 +8,18 @@
 - identities
 - events
 
-## First Query Indexes
+## 首批查询索引
 
-- keyword search across SMS text, voice transcript, voice summary
+- 跨 SMS text、voice transcript、voice summary 的 keyword search
 - participant/contact grouping
-- timeline ordering by event timestamp
-- thread reconstruction from `same_thread`
+- 按 event timestamp 排序的 timeline
+- 从 `same_thread` 重建 thread
 
-## Storage Direction
+## 存储方向
 
-The first backend release supports:
+首个 backend 版本支持：
 
-- SQLite for local-first deployment
-- PostgreSQL for service-style deployment
+- SQLite：用于 local-first deployment
+- PostgreSQL：用于 service-style deployment
 
-The schema is normalized enough to support future adapters without changing the exported `MsgLayer` wire format.
+schema 已做基础规范化，以便未来增加 adapter 时不改变导出的 `MsgLayer` wire format。

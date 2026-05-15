@@ -1,57 +1,67 @@
-# Agent Operating Spec
+# Agent 操作规范
 
-Commory is a local-first communication memory monorepo. Keep context narrow, respect user changes, and verify the exact surface you touched.
+Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文收窄，尊重用户已有改动，并验证你实际触碰的范围。
 
-## Read First
+## 先读这些
 
-- Android UI or mobile product work: `android/README.md`, `android/app/src/main/java/com/iskenkenya/commory/mobile/ui/navigation/NavigationHost.kt`, `android/app/src/main/java/com/iskenkenya/commory/mobile/runtime/`, and the target screen or ViewModel.
-- Android data/auth/storage work: `android/sdk/backup`, `android/sdk/auth`, `android/sdk/storage`, plus `android/app/src/main/java/com/iskenkenya/commory/mobile/remote/`.
-- Backend API work: `backend/internal/api/server.go`, `backend/internal/auth`, `backend/internal/storage`, and `docs/mobile-api.md`.
-- Web dashboard work: `web/package.json`, `web/src/api`, `web/src/router`, and the target view/store module.
-- MsgLayer/schema work: `msglayer/schema/v0.1/root.schema.json`, `msglayer/examples`, and `backend/internal/msglayer`.
-- Governance or CI work: `docs/engineering-standards.md`, `.github/workflows/ci.yml`, `scripts/`, `.agents/skills`, and `.claude/skills`.
+- Android UI 或移动端产品工作：`android/README.md`、`android/app/src/main/java/com/iskenkenya/commory/mobile/ui/navigation/NavigationHost.kt`、`android/app/src/main/java/com/iskenkenya/commory/mobile/runtime/`，以及目标 screen 或 ViewModel。
+- Android 数据、认证、存储工作：`android/sdk/backup`、`android/sdk/auth`、`android/sdk/storage`，以及 `android/app/src/main/java/com/iskenkenya/commory/mobile/remote/`。
+- Backend API 工作：`backend/internal/api/server.go`、`backend/internal/auth`、`backend/internal/storage`，以及 `docs/mobile-api.md`。
+- Web dashboard 工作：`web/package.json`、`web/src/api`、`web/src/router`，以及目标 view/store 模块。
+- MsgLayer/schema 工作：`msglayer/schema/v0.1/root.schema.json`、`msglayer/examples`，以及 `backend/internal/msglayer`。
+- 治理或 CI 工作：`docs/engineering-standards.md`、`.github/workflows/ci.yml`、`scripts/`、`.agents/skills`、`.claude/skills`。
 
-## Context Bundles
+## 上下文包
 
-- Android UI bundle: navigation host, target screen, resources in `values/`, `values-en/`, `values-zh-rCN/`, and related ViewModel.
-- Android auth/network bundle: runtime environment, auth provider, server client, SDK auth/storage contracts, and mobile API docs.
-- Backend API bundle: server handler, auth middleware/service, storage provider, API tests, and mobile API contract.
-- Web dashboard bundle: API client, auth store, route guard, target view, and Element Plus patterns already used in `web/`.
-- MsgLayer bundle: schema, examples, validators, Android mapper/serializer.
-- Governance bundle: engineering standards, CI workflow, repo hygiene, skills sync, i18n check.
+- Android UI 包：navigation host、目标 screen、`values/`、`values-en/`、`values-zh-rCN/` 中的资源，以及相关 ViewModel。
+- Android auth/network 包：runtime environment、auth provider、server client、SDK auth/storage contracts，以及移动端 API 文档。
+- Backend API 包：server handler、auth middleware/service、storage provider、API tests，以及移动端 API contract。
+- Web dashboard 包：API client、auth store、route guard、目标 view，以及 `web/` 已使用的 Element Plus patterns。
+- MsgLayer 包：schema、examples、validators、Android mapper/serializer。
+- 治理包：engineering standards、CI workflow、repo hygiene、skills sync、i18n check。
 
-Load only the bundle needed for the task. Do not spread temporary decisions into tool-specific files; durable rules belong in `docs/engineering-standards.md`, agent entrypoints in this file, and release history in `CHANGELOG.md`.
+只加载任务需要的上下文包。不要把临时决策扩散到工具专属文件；长期规则放在 `docs/engineering-standards.md`，Agent 入口放在本文件，发布历史放在 `CHANGELOG.md`。
 
-## Repository Boundaries
+## 仓库边界
 
-- `previewer/` is a historical archive. Do not update it for current Commory work.
-- `references/` is read-only external reference code. Rewrite ideas in Commory modules instead of editing reference mirrors.
-- `.agents/skills` is the source of truth for project skills.
-- `.claude/skills` is a generated compatibility mirror for Claude Code. Do not edit it by hand; run `bash scripts/sync-agent-skills.sh`.
-- Do not add `AI_EDIT_LOG.md`, debug reports, tracked logs, build outputs, `.DS_Store`, or IDE/cache files.
+- `previewer/` 是历史归档。当前 Commory 工作不要更新它。
+- `references/` 是只读外部参考代码。把思路改写进 Commory 自有模块，不要编辑参考镜像。
+- `.agents/skills` 是项目 skills 的唯一手工维护来源。
+- `.claude/skills` 是 Claude Code 兼容镜像，由脚本生成。不要手改；运行 `bash scripts/sync-agent-skills.sh`。
+- 不要新增 `AI_EDIT_LOG.md`、调试报告、已追踪日志、构建产物、`.DS_Store` 或 IDE/cache 文件。
 
-## Naming
+## 命名
 
-- Android app id: `com.iskenkenya.commory`.
-- Android app namespace and source packages: `com.iskenkenya.commory.mobile`.
-- Android SDK packages: `com.iskenkenya.commory.sdk.*`.
-- Go backend module remains `github.com/IsKenKenYa/Commory/backend`; it does not conflict with Android package names.
-- User-visible current product name is `Commory`. Historical changelog entries may mention old names as history.
+- Android app id：`com.iskenkenya.commory`。
+- Android app namespace 和源码包：`com.iskenkenya.commory.mobile`。
+- Android SDK 包：`com.iskenkenya.commory.sdk.*`。
+- Go backend module 保持 `github.com/IsKenKenYa/Commory/backend`；它不与 Android 包名冲突。
+- 当前用户可见产品名是 `Commory`。历史 changelog 可以保留旧名称作为历史。
+
+## 中文优先与国际化
+
+- 文档、Rules、注释、维护者提示、数据库备注中文优先；必要时第一次出现写作“中文（English）”。
+- 产品代码不要为了“中文优先”写死中文。用户可见文本必须进入 i18n/resource 体系。
+- Web 使用 `vue-i18n`，语言包位于 `web/src/locales/langs/zh.json` 与 `web/src/locales/langs/en.json`。
+- Android 用户可见字符串必须同时维护 `values/strings.xml`、`values-en/strings.xml`、`values-zh-rCN/strings.xml`。
+- 系统内置国际化只负责中文和英文；其他语言可以由社区后续扩展。
+- 不要翻译代码标识符、JSON key、数据库字段名、HTTP endpoint、配置项、命令、包名、常量值和公开契约。
+- `README.en.md` 是英文 README，保持英文；中文 README 更新了产品能力时，同步检查英文 README 是否需要对应更新。
 
 ## Skills
 
-Project skills must follow the Codex skill shape:
+项目 skills 必须遵循 Codex skill 形态：
 
-- Required: `SKILL.md` with concise YAML frontmatter (`name`, `description`) and a lean workflow.
-- Recommended: `agents/openai.yaml` when UI metadata is useful.
-- Optional: `scripts/`, `references/`, `assets/`.
-- Forbidden inside a skill: `README.md`, `CHANGELOG.md`, `AGENTS.md`, install guides, quick references, or long duplicated docs.
+- 必需：`SKILL.md`，包含简洁 YAML frontmatter（`name`、`description`）和精简 workflow。
+- 推荐：需要 UI metadata 时使用 `agents/openai.yaml`。
+- 可选：`scripts/`、`references/`、`assets/`。
+- 禁止放入 skill：`README.md`、`CHANGELOG.md`、`AGENTS.md`、安装指南、快速参考或大段重复文档。
 
-When creating or updating a skill, keep `SKILL.md` short, move detailed variants to directly linked files under `references/`, and run `bash scripts/sync-agent-skills.sh`.
+创建或更新 skill 时，保持 `SKILL.md` 简短，把详细变体移到 `references/` 下直接链接的文件，并运行 `bash scripts/sync-agent-skills.sh`。
 
-## Verification
+## 验证
 
-- Backend: `cd backend && go vet ./... && go test ./... -coverprofile=coverage.out`.
-- Android: `cd android && ./gradlew :app:compileDebugKotlin && ./gradlew :app:testDebugUnitTest`.
-- Web: `cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm build`.
-- Governance: `bash scripts/check-repo-hygiene.sh`, `bash scripts/check-android-i18n.sh`, `bash scripts/sync-agent-skills.sh --check`, and `bash scripts/report-loc-complexity.sh`.
+- Backend：`cd backend && go vet ./... && go test ./... -coverprofile=coverage.out`。
+- Android：`cd android && ./gradlew :app:compileDebugKotlin && ./gradlew :app:testDebugUnitTest`。
+- Web：`cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm build`。
+- 治理：`bash scripts/check-repo-hygiene.sh`、`bash scripts/check-android-i18n.sh`、`bash scripts/sync-agent-skills.sh --check`、`bash scripts/report-loc-complexity.sh`。

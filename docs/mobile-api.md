@@ -1,10 +1,10 @@
-# Mobile API Contract
+# 移动端 API 契约
 
-The Android app uses Commory Server only when the user selects `COMMORY_SERVER`. `LOCAL_ONLY` never requires authentication or network access.
+Android app 只有在用户选择 `COMMORY_SERVER` 时才使用 Commory Server。`LOCAL_ONLY` 从不要求认证或网络访问。
 
 ## Envelope
 
-JSON API responses use:
+JSON API 响应使用：
 
 ```json
 {
@@ -14,13 +14,13 @@ JSON API responses use:
 }
 ```
 
-Errors use the same envelope with `data: null` and an HTTP status code matching `code`. Android displays `msg` as a retryable user-facing error after localization wrapping.
+错误响应使用相同 envelope，`data: null`，HTTP status code 与 `code` 对齐。Android 不应直接把服务端 `msg` 当最终文案展示；它应包裹为可重试、可本地化的用户错误。
 
 ## Setup
 
 - `GET /api/setup`
-- Public endpoint.
-- Returns whether the server has been initialized.
+- 公开 endpoint。
+- 返回服务器是否已经初始化。
 
 ```json
 {
@@ -33,35 +33,35 @@ Errors use the same envelope with `data: null` and an HTTP status code matching 
 ## Auth
 
 - `POST /api/auth/register`
-- Body: `{ "userName": "alice", "email": "alice@example.com", "password": "..." }`
-- Response data: `{ "user": User, "token": "access", "refreshToken": "refresh" }`
+- Body：`{ "userName": "alice", "email": "alice@example.com", "password": "..." }`
+- Response data：`{ "user": User, "token": "access", "refreshToken": "refresh" }`
 
 - `POST /api/auth/login`
-- Body: `{ "userName": "alice", "password": "..." }`
-- Response data matches register.
+- Body：`{ "userName": "alice", "password": "..." }`
+- Response data 与 register 一致。
 
 - `POST /api/auth/refresh`
-- Body: `{ "refreshToken": "refresh" }`
-- Response data: `{ "token": "access", "refreshToken": "refresh" }`
+- Body：`{ "refreshToken": "refresh" }`
+- Response data：`{ "token": "access", "refreshToken": "refresh" }`
 
-Android sends authenticated requests with `Authorization: Bearer <access token>`.
+Android 通过 `Authorization: Bearer <access token>` 发送认证请求。
 
 ## User
 
 - `GET /api/user/info`
-- Authenticated.
-- Returns the current user record. Android uses id, username, email, and roles for session display only.
+- 需要认证。
+- 返回当前用户记录。Android 只使用 id、username、email 和 roles 做 session 展示。
 
 ## Imports
 
 - `GET /api/imports`
-- Authenticated.
-- Returns import summaries with id, schema version, import timestamp, source path, event count, and identity count.
+- 需要认证。
+- 返回 import summaries，包括 id、schema version、import timestamp、source path、event count 和 identity count。
 
 - `POST /api/imports/upload`
-- Authenticated.
-- Body: raw `application/json` MsgLayer export or multipart `file`.
-- Response data:
+- 需要认证。
+- Body：原始 `application/json` MsgLayer export 或 multipart `file`。
+- Response data：
 
 ```json
 {
@@ -71,12 +71,12 @@ Android sends authenticated requests with `Authorization: Bearer <access token>`
 ```
 
 - `GET /api/imports/{importId}/export`
-- Authenticated.
-- Returns the raw MsgLayer JSON export for restore or local inspection.
+- 需要认证。
+- 返回原始 MsgLayer JSON export，用于恢复或本地检查。
 
-## Mobile Behavior
+## 移动端行为
 
-- Server mode always writes a local backup first.
-- If `syncOnBackup` is enabled and the user is authenticated, Android uploads the generated MsgLayer JSON to `/api/imports/upload`.
-- Switching to local mode clears the mobile session but does not delete local backup files.
-- Network, auth, and validation failures must not invalidate the local backup.
+- Server mode 始终先写本地备份。
+- `syncOnBackup` 启用且用户已认证时，Android 把生成的 MsgLayer JSON 上传到 `/api/imports/upload`。
+- 切回 local mode 会清除 mobile session，但不删除本地备份文件。
+- 网络、认证和验证失败不得让已经生成的本地备份失效。

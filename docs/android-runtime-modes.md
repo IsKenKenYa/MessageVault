@@ -1,18 +1,18 @@
-# Android Runtime Modes
+# Android 运行模式
 
-Commory Android supports two explicit runtime modes.
+Commory Android 支持两个明确的运行模式。
 
 ## Local Only
 
-- No account or server is required.
-- Backup and restore use local app storage.
-- Agent context policy is `LOCAL_ONLY`; context must not be sent to server-backed providers.
-- Switching into local mode clears mobile auth tokens but preserves local backup files.
+- 不需要账号或服务器。
+- 备份和恢复使用本地 app storage。
+- Agent context policy 为 `LOCAL_ONLY`；上下文不得发送给 server-backed provider。
+- 切换到 local mode 会清除移动端 auth tokens，但保留本地备份文件。
 
 ## Commory Server
 
-- User signs in with the existing Commory username/password auth flow.
-- Backup still writes a local MsgLayer JSON file first.
-- When `syncOnBackup` is enabled and a valid session exists, Android uploads the generated file to `/api/imports/upload`.
-- Remote import history and export use authenticated Commory Server endpoints.
-- Agent context policy is `SERVER_ALLOWED`, but future AI features must still apply relevance and minimum-necessary context filtering.
+- 用户使用现有 Commory username/password auth flow 登录。
+- 备份仍然先写入本地 MsgLayer JSON 文件。
+- `syncOnBackup` 启用且存在有效 session 时，Android 把生成文件上传到 `/api/imports/upload`。
+- 远程 import history 和 export 使用已认证的 Commory Server endpoints。
+- Agent context policy 为 `SERVER_ALLOWED`，但未来 AI 功能仍必须应用相关性过滤和最小必要上下文过滤。

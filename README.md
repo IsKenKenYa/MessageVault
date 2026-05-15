@@ -26,6 +26,12 @@ Commory
 
 核心原则保持不变：本地优先，服务器可选，隐私可控。
 
+## 中文优先与国际化
+
+中文是项目维护资料的优先语言，便于当前维护者快速理解架构、规则和上下文；[README.en.md](README.en.md) 保持英文版，不会因为中文优先而放弃国际化。
+
+产品代码中的用户可见文案不应硬编码中文或英文。Web 使用 `vue-i18n`，内置 `web/src/locales/langs/zh.json` 与 `web/src/locales/langs/en.json`；Android 使用 `values/`、`values-en/`、`values-zh-rCN/` 资源。系统内置国际化只负责中文和英文，更多语言交给社区扩展。
+
 ## 组件
 
 ### `android/`
@@ -88,6 +94,10 @@ pnpm dev
 - 工程标准：[docs/engineering-standards.md](docs/engineering-standards.md)
 - 项目治理：[NOTICE.md](NOTICE.md)
 - 当前移动端契约：[docs/mobile-api.md](docs/mobile-api.md)
+- ADR：
+  - [参考资料治理](docs/adr/0001-参考资料治理.md)
+  - [数据库 sqlc 迁移](docs/adr/0002-数据库-sqlc-迁移.md)
+  - [Agent 运行时边界](docs/adr/0003-agent-运行时边界.md)
 
 `.agents/skills` 是项目 Skills 的唯一手工维护来源，`.claude/skills` 是 Claude Code 兼容镜像。更新 Skills 后运行：
 

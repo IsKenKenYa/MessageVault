@@ -24,6 +24,12 @@ The current product state is local backup plus optional server upload. The next 
 
 The core principles remain: local-first, server-optional, privacy-controlled.
 
+## Chinese-First Docs And Internationalization
+
+Chinese is the preferred language for maintainer-facing docs, rules, comments, and operational notes because the current maintainer is a native Chinese speaker. This English README remains the English entrypoint.
+
+User-facing product text must not be hard-coded in either Chinese or English. Web uses `vue-i18n` with `web/src/locales/langs/zh.json` and `web/src/locales/langs/en.json`; Android uses `values/`, `values-en/`, and `values-zh-rCN/` resources. Built-in internationalization covers Chinese and English; additional languages can be community-maintained later.
+
 ## Components
 
 - `android/`: Commory Android client. App id is `com.iskenkenya.commory`; app source namespace is `com.iskenkenya.commory.mobile`; SDK namespaces are `com.iskenkenya.commory.sdk.*`.
@@ -58,6 +64,10 @@ pnpm dev
 - Engineering standards: `docs/engineering-standards.md`
 - Governance notice: `NOTICE.md`
 - Mobile API contract: `docs/mobile-api.md`
+- ADRs:
+  - `docs/adr/0001-参考资料治理.md`
+  - `docs/adr/0002-数据库-sqlc-迁移.md`
+  - `docs/adr/0003-agent-运行时边界.md`
 
 `.agents/skills` is the source of truth for project skills. `.claude/skills` is the Claude Code compatibility mirror. After changing skills, run:
 
