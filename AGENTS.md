@@ -24,6 +24,20 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 
 只加载任务需要的上下文包。不要把临时决策扩散到工具专属文件；长期规则放在 `docs/engineering-standards.md`，Agent 入口放在本文件，发布历史放在 `CHANGELOG.md`。
 
+## 结构治理
+
+- 单文件只承载一个 feature slice 或一个清晰的层级职责；不要把多个独立功能继续堆进 `server.go`、`*service.go`、provider 实现文件。
+- 新增代码默认先并入现有同职责文件；仅在跨职责、逼近阈值或能明显改善审阅边界时拆分。
+- 禁止为了“拆分”制造 1 函数 / 1 类型微文件。新增紧耦合 helper 若总量低于约 `80` 行，默认并入同 feature 文件。
+- 手写业务源码进入重构警戒线为 `350` 行，硬上限为 `500` 行；生成代码、schema、fixture、资源文件不纳入硬失败，但超过 `1000` 行仍需在复杂度报告中暴露。
+- `bash scripts/check-repo-hygiene.sh` 默认对当前变更集中的手写源码执行 `500` 行硬门禁；全仓历史热点由 `bash scripts/report-loc-complexity.sh` 暴露，并按触碰范围持续治理。
+- handler 层按认证、导入、查询、会话、审计等能力分组；auth 层按 orchestration、token、password、audit/rate-limit 分组；storage provider 按 import/query、auth/session、setup/passkey/support 分组；test 按行为域分组，不保留 mega test file。
+- 跨 Android、Backend、Web 的改动必须同步评估契约、测试、文档和部署影响。
+- 默认按纵向切片推进：先修契约与基础层，再补客户端，再补 UI/治理；不要堆叠不可审阅的大 diff。
+- 默认不使用 subagent 或平行代理；只有用户明确要求委派、分工或 parallel agent work 时才可使用。
+- 面向用户的最终交付禁止包含原始 scratchpad、逐段回放式研究过程或重复的中间分析；保留决策、变更、验证和风险即可。
+- 长期规则变更必须同步更新 `AGENTS.md` 与 `CLAUDE.md`，不能只写进其它文档。
+
 ## 仓库边界
 
 - `previewer/` 是历史归档。当前 Commory 工作不要更新它。
@@ -39,6 +53,7 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - `docs/technical-debt.md` 记录已知技术债，不要把无关债务混入功能 PR。
 - 禁止直接推送 `main`；`feat/*` 用于功能，`fix/*` 用于修复。
 - 跨 Android、Backend、Web、MsgLayer、Agent、Docker 的变更必须同步评估契约、文档、测试和部署影响。
+- 大文件或大 diff 若暂时无法继续拆分，必须在 PR 或交付说明里给出简短理由。
 
 ## 命名
 
