@@ -93,6 +93,25 @@ func testRefreshTokenRotation(t *testing.T, factory ProviderFactory) {
 		t.Fatalf("SaveRefreshToken: %v", err)
 	}
 
+	child := storage.RefreshTokenRecord{
+		ID:        uuid.New().String(),
+		UserID:    user.ID,
+		TokenHash: "child_" + uuid.New().String(),
+		ParentID:  token.ID,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+	}
+	if err := store.SaveRefreshToken(ctx, child); err != nil {
+		t.Fatalf("SaveRefreshToken child: %v", err)
+	}
+
+	hasChild, err := store.HasActiveRefreshTokenChild(ctx, token.ID)
+	if err != nil {
+		t.Fatalf("HasActiveRefreshTokenChild: %v", err)
+	}
+	if !hasChild {
+		t.Fatal("expected active child refresh token")
+	}
+
 	consumed, err := store.ConsumeRefreshToken(ctx, token.TokenHash)
 	if err != nil {
 		t.Fatalf("ConsumeRefreshToken: %v", err)
@@ -104,6 +123,17 @@ func testRefreshTokenRotation(t *testing.T, factory ProviderFactory) {
 	_, err = store.ConsumeRefreshToken(ctx, token.TokenHash)
 	if err == nil {
 		t.Fatal("expected error for already consumed token")
+	}
+
+	if err := store.RevokeRefreshTokenFamily(ctx, token.ID); err != nil {
+		t.Fatalf("RevokeRefreshTokenFamily: %v", err)
+	}
+	hasChild, err = store.HasActiveRefreshTokenChild(ctx, token.ID)
+	if err != nil {
+		t.Fatalf("HasActiveRefreshTokenChild after revoke: %v", err)
+	}
+	if hasChild {
+		t.Fatal("expected family revoke to revoke child refresh token")
 	}
 }
 

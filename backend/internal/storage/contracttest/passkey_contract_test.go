@@ -95,4 +95,17 @@ func testChallengeLifecycle(t *testing.T, factory ProviderFactory) {
 	if err == nil {
 		t.Fatal("expected error for deleted challenge")
 	}
+
+	expired := storage.ChallengeRecord{
+		ID:        uuid.New().String(),
+		Challenge: "expired_challenge_value",
+		FlowType:  "passkey_login",
+		ExpiresAt: time.Now().Add(-1 * time.Minute).UTC(),
+	}
+	if err := store.CreateChallenge(ctx, expired); err != nil {
+		t.Fatalf("CreateChallenge expired: %v", err)
+	}
+	if _, err := store.GetChallenge(ctx, expired.ID); err == nil {
+		t.Fatal("expected error for expired challenge")
+	}
 }

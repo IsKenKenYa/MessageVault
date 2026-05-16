@@ -65,6 +65,7 @@ func clearRefreshCookie(w http.ResponseWriter, secure bool) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 		Secure:   secure,
 	})
 }

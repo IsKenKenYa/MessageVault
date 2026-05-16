@@ -36,14 +36,12 @@ data class UserDto(
 
 data class TokenPairDto(
     val accessToken: String? = null,
-    val token: String? = null,
-    val refreshToken: String
+    val token: String? = null
 )
 
 data class AuthResponseDto(
     val user: UserDto,
-    val token: String,
-    val refreshToken: String
+    val token: String
 )
 
 data class RegisterRequestDto(
@@ -55,14 +53,6 @@ data class RegisterRequestDto(
 data class LoginRequestDto(
     val userName: String,
     val password: String
-)
-
-data class RefreshRequestDto(
-    val refreshToken: String
-)
-
-data class LogoutRequestDto(
-    val refreshToken: String
 )
 
 data class ImportSummaryDto(
@@ -99,10 +89,10 @@ interface CommoryApiService {
     suspend fun login(@Body request: LoginRequestDto): Response<ApiEnvelope<AuthResponseDto>>
 
     @POST("api/auth/refresh")
-    suspend fun refresh(@Body request: RefreshRequestDto): Response<ApiEnvelope<TokenPairDto>>
+    suspend fun refresh(): Response<ApiEnvelope<TokenPairDto>>
 
     @POST("api/auth/logout")
-    suspend fun logout(@Body request: LogoutRequestDto): Response<ApiEnvelope<Map<String, Boolean>>>
+    suspend fun logout(): Response<ApiEnvelope<Map<String, Boolean>>>
 
     @GET("api/user/info")
     suspend fun getUserInfo(@Header("Authorization") authorization: String): Response<ApiEnvelope<UserDto>>

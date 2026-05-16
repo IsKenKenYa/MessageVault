@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -56,7 +55,7 @@ func (s *Service) allowLoginAttempt(remoteAddr string) error {
 	}
 	if len(window) >= 5 {
 		s.loginWindow[host] = window
-		return fmt.Errorf("too many login attempts, please retry in a minute")
+		return ErrTooManyLoginAttempts
 	}
 	s.loginWindow[host] = append(window, now)
 	return nil

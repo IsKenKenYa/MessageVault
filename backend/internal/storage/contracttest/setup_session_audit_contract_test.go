@@ -57,14 +57,33 @@ func testSessionLifecycle(t *testing.T, factory ProviderFactory) {
 		t.Fatal(err)
 	}
 
-	session := storage.SessionRecord{
-		ID:        uuid.New().String(),
+	refreshTokenID := uuid.New().String()
+	if err := store.SaveRefreshToken(ctx, storage.RefreshTokenRecord{
+		ID:        refreshTokenID,
 		UserID:    user.ID,
-		IPAddress: "127.0.0.1",
-		UserAgent: "test-agent",
+		TokenHash: "hash_" + uuid.New().String(),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}); err != nil {
+		t.Fatalf("SaveRefreshToken: %v", err)
+	}
+
+	session := storage.SessionRecord{
+		ID:             uuid.New().String(),
+		UserID:         user.ID,
+		RefreshTokenID: refreshTokenID,
+		IPAddress:      "127.0.0.1",
+		UserAgent:      "test-agent",
 	}
 	if err := store.CreateSession(ctx, session); err != nil {
 		t.Fatalf("CreateSession: %v", err)
+	}
+
+	byRefreshToken, err := store.GetSessionByRefreshTokenID(ctx, refreshTokenID)
+	if err != nil {
+		t.Fatalf("GetSessionByRefreshTokenID: %v", err)
+	}
+	if byRefreshToken.ID != session.ID {
+		t.Fatalf("session id mismatch by refresh token: got %s", byRefreshToken.ID)
 	}
 
 	sessions, err := store.ListSessionsByUser(ctx, user.ID)
@@ -73,6 +92,35 @@ func testSessionLifecycle(t *testing.T, factory ProviderFactory) {
 	}
 	if len(sessions) != 1 {
 		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+
+	otherRefreshTokenID := uuid.New().String()
+	if err := store.SaveRefreshToken(ctx, storage.RefreshTokenRecord{
+		ID:        otherRefreshTokenID,
+		UserID:    user.ID,
+		TokenHash: "hash_" + uuid.New().String(),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}); err != nil {
+		t.Fatalf("SaveRefreshToken other: %v", err)
+	}
+	otherSession := storage.SessionRecord{
+		ID:             uuid.New().String(),
+		UserID:         user.ID,
+		RefreshTokenID: otherRefreshTokenID,
+	}
+	if err := store.CreateSession(ctx, otherSession); err != nil {
+		t.Fatalf("CreateSession other: %v", err)
+	}
+
+	if err := store.RevokeOtherSessions(ctx, user.ID, session.ID); err != nil {
+		t.Fatalf("RevokeOtherSessions: %v", err)
+	}
+	sessions, err = store.ListSessionsByUser(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListSessionsByUser after revoke others: %v", err)
+	}
+	if len(sessions) != 1 || sessions[0].ID != session.ID {
+		t.Fatalf("expected current session to remain after revoke others, got %+v", sessions)
 	}
 
 	if err := store.UpdateSessionLastSeen(ctx, session.ID); err != nil {

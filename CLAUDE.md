@@ -8,7 +8,8 @@ Claude Code 应把 `AGENTS.md` 视为项目唯一的规范入口。
 - 新增代码默认先并入现有同职责文件；仅在跨职责、逼近阈值或能明显改善审阅边界时拆分。
 - 禁止为了“拆分”制造 1 函数 / 1 类型微文件；低于约 `80` 行的紧耦合 helper 默认并入同 feature 文件。
 - 手写业务源码 `350` 行进入重构警戒线，`500` 行为硬上限；生成代码、schema、fixture、资源文件不做硬失败，但要在复杂度报告里暴露 `1000+` 文件。
-- `bash scripts/check-repo-hygiene.sh` 默认拦截当前变更集中的 `500+` 手写源码；全仓历史热点继续通过 `bash scripts/report-loc-complexity.sh` 报告。
+- Web 参考基线通过 `web/reference-baseline-paths.txt` 显式维护；这些参考衍生文件单独报表，不按 Commory-owned Web 代码执行 `500` 行硬失败。
+- `bash scripts/check-repo-hygiene.sh` 默认拦截当前变更集中的 Commory-owned `500+` 手写源码；全仓历史热点和 Web baseline 热区继续通过 `bash scripts/report-loc-complexity.sh` 报告。
 - 跨 Android、Backend、Web 的改动必须同步评估契约、测试、文档和部署影响，并按纵向切片推进，避免不可审阅的大 diff。
 - 默认不使用 subagent 或平行代理；只有用户明确要求委派或分工时才可使用。
 - 面向用户的交付不要回放原始 scratchpad 或重复中间研究结论，只保留决策、变更、验证和风险。
@@ -36,6 +37,7 @@ bash scripts/sync-agent-skills.sh
 - 默认部署是单端口：Go backend 同时提供 `/api/*` 和 Web 静态资源。
 - 根目录 `Dockerfile` 是完整 Commory 镜像；`docker-compose.yml` 默认只暴露 `3000`。
 - Web UI 必须遵循 `docs/web-dashboard-guidelines.md`，以 `references/art-design-pro` 为模板基线。
+- 模糊需求先跑 `.agents/skills/grill-me`，陌生区域先做 `.agents/skills/zoom-out`，回归问题优先按 `.agents/skills/diagnose` 或 `.agents/skills/tdd` 留痕，准备交接时按 `.agents/skills/handoff` 输出上下文。
 - 多端功能必须同步评估 Android、Backend、Web、MsgLayer、Agent 和 Docker/部署影响。
 
 ## 常用命令

@@ -14,7 +14,7 @@ class RuntimeModePolicyTest {
         assertTrue(RuntimeModePolicy.requiresServerAuth(anonymous))
 
         val authenticated = anonymous.copy(
-            authSession = AuthSession(accessToken = "access", refreshToken = "refresh", userId = "user")
+            authSession = AuthSession(accessToken = "access", userId = "user")
         )
         assertFalse(RuntimeModePolicy.requiresServerAuth(authenticated))
     }
@@ -23,7 +23,6 @@ class RuntimeModePolicyTest {
     fun expiredAccessTokenDoesNotAuthenticateSession() {
         val expired = AuthSession(
             accessToken = "access",
-            refreshToken = "refresh",
             accessTokenExpiresAtEpochSeconds = (System.currentTimeMillis() / 1000L) - 60L
         )
 

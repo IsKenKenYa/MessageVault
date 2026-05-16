@@ -38,3 +38,8 @@ DELETE FROM refresh_tokens WHERE expires_at < CURRENT_TIMESTAMP;
 SELECT * FROM refresh_tokens
 WHERE token_hash = ?
 LIMIT 1;
+
+-- name: HasActiveRefreshTokenChild :one
+SELECT COUNT(*) > 0 AS has_active_child
+FROM refresh_tokens
+WHERE parent_id = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP;

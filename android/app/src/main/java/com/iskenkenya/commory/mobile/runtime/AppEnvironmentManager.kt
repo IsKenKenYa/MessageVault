@@ -38,7 +38,6 @@ class AppEnvironmentManager(context: Context) {
             syncOnBackup = preferences[KEY_SYNC_ON_BACKUP] ?: true,
             authSession = AuthSession(
                 accessToken = preferences[KEY_ACCESS_TOKEN],
-                refreshToken = preferences[KEY_REFRESH_TOKEN],
                 accessTokenExpiresAtEpochSeconds = preferences[KEY_ACCESS_TOKEN_EXPIRES_AT]?.toLongOrNull(),
                 sessionId = preferences[KEY_SESSION_ID],
                 deviceName = preferences[KEY_DEVICE_NAME],
@@ -57,30 +56,35 @@ class AppEnvironmentManager(context: Context) {
             preferences[KEY_RUNTIME_MODE] = mode.name
             preferences[KEY_MODE_SELECTED] = true
         }
+        cachedSnapshot = cachedSnapshot.copy(mode = mode, modeSelected = true)
     }
 
     suspend fun updateServerUrl(serverUrl: String) {
+        val normalized = normalizeServerUrl(serverUrl)
         dataStore.edit { preferences ->
-            preferences[KEY_SERVER_URL] = normalizeServerUrl(serverUrl)
+            preferences[KEY_SERVER_URL] = normalized
         }
+        cachedSnapshot = cachedSnapshot.copy(serverUrl = normalized)
     }
 
     suspend fun updateLocale(locale: AppLocaleOption) {
         dataStore.edit { preferences ->
             preferences[KEY_LOCALE] = locale.name
         }
+        cachedSnapshot = cachedSnapshot.copy(locale = locale)
     }
 
     suspend fun updateSyncOnBackup(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_SYNC_ON_BACKUP] = enabled
         }
+        cachedSnapshot = cachedSnapshot.copy(syncOnBackup = enabled)
     }
 
     suspend fun updateSession(session: AuthSession) {
         dataStore.edit { preferences ->
             setOrRemove(preferences, KEY_ACCESS_TOKEN, session.accessToken)
-            setOrRemove(preferences, KEY_REFRESH_TOKEN, session.refreshToken)
+            preferences.remove(KEY_REFRESH_TOKEN)
             setOrRemove(preferences, KEY_ACCESS_TOKEN_EXPIRES_AT, session.accessTokenExpiresAtEpochSeconds?.toString())
             setOrRemove(preferences, KEY_SESSION_ID, session.sessionId)
             setOrRemove(preferences, KEY_DEVICE_NAME, session.deviceName)
@@ -88,6 +92,7 @@ class AppEnvironmentManager(context: Context) {
             setOrRemove(preferences, KEY_USER_NAME, session.userName)
             setOrRemove(preferences, KEY_EMAIL, session.email)
         }
+        cachedSnapshot = cachedSnapshot.copy(authSession = session)
     }
 
     suspend fun clearSession() {

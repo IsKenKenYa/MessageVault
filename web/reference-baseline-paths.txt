@@ -1,0 +1,23 @@
+# Paths and prefixes that remain reference-derived from references/art-design-pro.
+# These files are tracked separately from Commory-owned web code for line-count governance.
+web/src/assets/styles/
+web/src/components/core/
+web/src/config/
+web/src/directives/
+web/src/enums/
+web/src/hooks/core/
+web/src/locales/
+web/src/router/guards/
+web/src/router/modules/
+web/src/router/routes/
+web/src/store/modules/menu.ts
+web/src/store/modules/setting.ts
+web/src/store/modules/user.ts
+web/src/store/modules/worktab.ts
+web/src/types/
+web/src/utils/constants/links.ts
+web/src/utils/http/
+web/src/utils/storage/
+web/src/utils/sys/
+web/src/views/auth/
+web/src/views/exception/

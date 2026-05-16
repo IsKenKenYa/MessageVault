@@ -133,6 +133,7 @@ type Provider interface {
 
 	// 重放检测：查找任何匹配的 token（包括已撤销的）
 	FindAnyRefreshTokenByHash(context.Context, string) (RefreshTokenRecord, error)
+	HasActiveRefreshTokenChild(context.Context, string) (bool, error)
 	// 令牌族撤销：按 parent_id 链撤销整族
 	RevokeRefreshTokenFamily(context.Context, string) error
 	RevokeRefreshTokenByID(context.Context, string) error

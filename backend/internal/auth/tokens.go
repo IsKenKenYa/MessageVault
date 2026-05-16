@@ -161,16 +161,23 @@ func signHS256(input string, secret []byte) string {
 func (s *Service) classifyRefreshFailure(ctx context.Context, tokenHash string) error {
 	record, err := s.store.FindAnyRefreshTokenByHash(ctx, tokenHash)
 	if err != nil {
-		return fmt.Errorf("ERR_REFRESH_TOKEN_INVALID")
+		return ErrUnauthorized
 	}
 	if !record.RevokedAt.IsZero() {
+		hasActiveChild, childErr := s.store.HasActiveRefreshTokenChild(ctx, record.ID)
+		if childErr != nil {
+			return ErrOperationFailed
+		}
+		if hasActiveChild {
+			return ErrRefreshTokenRetry
+		}
 		_ = s.store.RevokeRefreshTokenFamily(ctx, record.ID)
-		return fmt.Errorf("ERR_REFRESH_TOKEN_REPLAYED")
+		return ErrRefreshTokenReplayed
 	}
 	if time.Now().UTC().After(record.ExpiresAt) {
-		return fmt.Errorf("ERR_REFRESH_TOKEN_EXPIRED")
+		return ErrRefreshTokenExpired
 	}
-	return fmt.Errorf("ERR_REFRESH_TOKEN_INVALID")
+	return ErrUnauthorized
 }
 
 func randomID(prefix string) string {

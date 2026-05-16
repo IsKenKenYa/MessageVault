@@ -30,7 +30,8 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - 新增代码默认先并入现有同职责文件；仅在跨职责、逼近阈值或能明显改善审阅边界时拆分。
 - 禁止为了“拆分”制造 1 函数 / 1 类型微文件。新增紧耦合 helper 若总量低于约 `80` 行，默认并入同 feature 文件。
 - 手写业务源码进入重构警戒线为 `350` 行，硬上限为 `500` 行；生成代码、schema、fixture、资源文件不纳入硬失败，但超过 `1000` 行仍需在复杂度报告中暴露。
-- `bash scripts/check-repo-hygiene.sh` 默认对当前变更集中的手写源码执行 `500` 行硬门禁；全仓历史热点由 `bash scripts/report-loc-complexity.sh` 暴露，并按触碰范围持续治理。
+- Web 参考基线以 `web/reference-baseline-paths.txt` 显式登记，覆盖 `references/art-design-pro` 演化而来的路径前缀；这些 baseline 文件会单独报表，不按 Commory-owned Web 代码执行 `500` 行硬失败。
+- `bash scripts/check-repo-hygiene.sh` 默认对当前变更集中的 Commory-owned 手写源码执行 `500` 行硬门禁；全仓历史热点与 Web baseline 热区由 `bash scripts/report-loc-complexity.sh` 暴露，并按触碰范围持续治理。
 - handler 层按认证、导入、查询、会话、审计等能力分组；auth 层按 orchestration、token、password、audit/rate-limit 分组；storage provider 按 import/query、auth/session、setup/passkey/support 分组；test 按行为域分组，不保留 mega test file。
 - 跨 Android、Backend、Web 的改动必须同步评估契约、测试、文档和部署影响。
 - 默认按纵向切片推进：先修契约与基础层，再补客户端，再补 UI/治理；不要堆叠不可审阅的大 diff。
@@ -76,6 +77,7 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 ## Web Dashboard
 
 - Web UI 以 `references/art-design-pro` 为模板基线，以 `references/memos/web` 为产品组织参考；只学习结构，不复制参考源码。
+- 遇到模糊需求先用 `.agents/skills/grill-me` 收窄边界；改动陌生区域先用 `.agents/skills/zoom-out` 识别影响面；缺陷回归优先按 `.agents/skills/diagnose` / `.agents/skills/tdd` 留下复现与验证；长链路协作或交接前补 `.agents/skills/handoff` 风格摘要。
 - 新 Web 页面必须满足中英 i18n、dark mode、主题变量、ECharts 配色、布局密度和 Element Plus 使用规范。
 - 具体规则见 `docs/web-dashboard-guidelines.md`。
 

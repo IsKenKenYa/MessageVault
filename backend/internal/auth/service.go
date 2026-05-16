@@ -37,11 +37,11 @@ func (s *Service) Register(ctx context.Context, userName, email, password string
 func (s *Service) RegisterWithDevice(ctx context.Context, userName, email, password, deviceName, ipAddress, userAgent string) (UserInfo, TokenPair, error) {
 	userName = strings.TrimSpace(userName)
 	if userName == "" || strings.TrimSpace(password) == "" {
-		return UserInfo{}, TokenPair{}, fmt.Errorf("username and password are required")
+		return UserInfo{}, TokenPair{}, ErrUsernamePasswordMissing
 	}
 
 	if _, err := s.store.FindUserByUserName(ctx, userName); err == nil {
-		return UserInfo{}, TokenPair{}, fmt.Errorf("username already exists")
+		return UserInfo{}, TokenPair{}, ErrUsernameExists
 	}
 
 	salt, hashed, err := hashPassword(password)
@@ -97,11 +97,11 @@ func (s *Service) RegisterAdmin(ctx context.Context, userName, email, password s
 func (s *Service) RegisterAdminWithDevice(ctx context.Context, userName, email, password, deviceName, ipAddress, userAgent string) (UserInfo, TokenPair, error) {
 	userName = strings.TrimSpace(userName)
 	if userName == "" || strings.TrimSpace(password) == "" {
-		return UserInfo{}, TokenPair{}, fmt.Errorf("username and password are required")
+		return UserInfo{}, TokenPair{}, ErrUsernamePasswordMissing
 	}
 
 	if _, err := s.store.FindUserByUserName(ctx, userName); err == nil {
-		return UserInfo{}, TokenPair{}, fmt.Errorf("username already exists")
+		return UserInfo{}, TokenPair{}, ErrUsernameExists
 	}
 
 	salt, hashed, err := hashPassword(password)
@@ -161,10 +161,10 @@ func (s *Service) LoginWithDevice(ctx context.Context, remoteAddr, userName, pas
 
 	record, err := s.store.FindUserByUserName(ctx, strings.TrimSpace(userName))
 	if err != nil {
-		return UserInfo{}, TokenPair{}, fmt.Errorf("invalid username or password")
+		return UserInfo{}, TokenPair{}, ErrInvalidCredentials
 	}
 	if !verifyPassword(password, record.PasswordSalt, record.PasswordHash) {
-		return UserInfo{}, TokenPair{}, fmt.Errorf("invalid username or password")
+		return UserInfo{}, TokenPair{}, ErrInvalidCredentials
 	}
 
 	if NeedsRehash(record.PasswordHash) {
@@ -186,7 +186,7 @@ func (s *Service) LoginWithDevice(ctx context.Context, remoteAddr, userName, pas
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, error) {
 	token := strings.TrimSpace(refreshToken)
 	if token == "" {
-		return TokenPair{}, fmt.Errorf("refresh token is required")
+		return TokenPair{}, ErrRefreshTokenRequired
 	}
 	tokenHash := hashToken(token)
 

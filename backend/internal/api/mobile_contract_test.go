@@ -127,10 +127,13 @@ func TestMobileRefreshRotatesRefreshToken(t *testing.T) {
 		t.Fatal("expected refresh token rotation")
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
-		"refreshToken": session.RefreshToken,
-	})))
-	req.Header.Set("Content-Type", "application/json")
+	secondRefresh := refreshMobileSession(t, handler, firstRefresh.RefreshToken)
+	if secondRefresh.RefreshToken == "" || secondRefresh.RefreshToken == firstRefresh.RefreshToken {
+		t.Fatal("expected second refresh token rotation")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: refreshCookieName, Value: session.RefreshToken})
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized {
@@ -149,20 +152,19 @@ func TestMobileLogoutRevokesRefreshToken(t *testing.T) {
 	handler := newTestMobileHandler(t)
 	session := registerMobileSession(t, handler, "logout-user", "logout@example.com")
 
-	logoutReq := httptest.NewRequest(http.MethodPost, "/api/auth/logout", bytes.NewReader(mustJSON(t, map[string]string{
-		"refreshToken": session.RefreshToken,
-	})))
-	logoutReq.Header.Set("Content-Type", "application/json")
+	logoutReq := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	logoutReq.AddCookie(&http.Cookie{Name: refreshCookieName, Value: session.RefreshToken})
 	logoutRes := httptest.NewRecorder()
 	handler.ServeHTTP(logoutRes, logoutReq)
 	if logoutRes.Code != http.StatusOK {
 		t.Fatalf("logout status = %d, body = %s", logoutRes.Code, logoutRes.Body.String())
 	}
+	if cookieHeader := logoutRes.Header().Get("Set-Cookie"); !bytes.Contains([]byte(cookieHeader), []byte("SameSite=Strict")) {
+		t.Fatalf("expected logout clear cookie to keep SameSite=Strict, got %q", cookieHeader)
+	}
 
-	refreshReq := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
-		"refreshToken": session.RefreshToken,
-	})))
-	refreshReq.Header.Set("Content-Type", "application/json")
+	refreshReq := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	refreshReq.AddCookie(&http.Cookie{Name: refreshCookieName, Value: session.RefreshToken})
 	refreshRes := httptest.NewRecorder()
 	handler.ServeHTTP(refreshRes, refreshReq)
 	if refreshRes.Code != http.StatusUnauthorized {
@@ -323,15 +325,15 @@ func registerMobileSession(t *testing.T, handler http.Handler, userName, email s
 	}
 	var envelope struct {
 		Data struct {
-			Token        string `json:"token"`
-			RefreshToken string `json:"refreshToken"`
+			Token string `json:"token"`
 		} `json:"data"`
 	}
 	decodeJSON(t, res.Body.Bytes(), &envelope)
-	if envelope.Data.Token == "" || envelope.Data.RefreshToken == "" {
+	refreshToken := readRefreshCookieValue(t, res)
+	if envelope.Data.Token == "" || refreshToken == "" {
 		t.Fatal("expected auth token pair")
 	}
-	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: envelope.Data.RefreshToken}
+	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: refreshToken}
 }
 
 func refreshMobileSession(t *testing.T, handler http.Handler, refreshToken string) mobileAuthSession {
@@ -345,22 +347,19 @@ func refreshMobileSession(t *testing.T, handler http.Handler, refreshToken strin
 
 func tryRefreshMobileSession(t *testing.T, handler http.Handler, refreshToken string) (string, mobileAuthSession, int) {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
-		"refreshToken": refreshToken,
-	})))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: refreshCookieName, Value: refreshToken})
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
 	var envelope struct {
 		Data struct {
-			Token        string `json:"token"`
-			RefreshToken string `json:"refreshToken"`
+			Token string `json:"token"`
 		} `json:"data"`
 	}
 	_ = json.Unmarshal(res.Body.Bytes(), &envelope)
 	return res.Body.String(), mobileAuthSession{
 		Token:        envelope.Data.Token,
-		RefreshToken: envelope.Data.RefreshToken,
+		RefreshToken: readRefreshCookieValue(t, res),
 	}, res.Code
 }
 
@@ -379,15 +378,15 @@ func loginMobileSession(t *testing.T, handler http.Handler, userName string) mob
 	}
 	var envelope struct {
 		Data struct {
-			Token        string `json:"token"`
-			RefreshToken string `json:"refreshToken"`
+			Token string `json:"token"`
 		} `json:"data"`
 	}
 	decodeJSON(t, res.Body.Bytes(), &envelope)
-	if envelope.Data.Token == "" || envelope.Data.RefreshToken == "" {
+	refreshToken := readRefreshCookieValue(t, res)
+	if envelope.Data.Token == "" || refreshToken == "" {
 		t.Fatal("expected login token pair")
 	}
-	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: envelope.Data.RefreshToken}
+	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: refreshToken}
 }
 
 func listMobileSessions(t *testing.T, handler http.Handler, token string) []mobileSessionRecord {
@@ -429,6 +428,16 @@ func decodeJSON(t *testing.T, data []byte, target any) {
 	if err := json.Unmarshal(data, target); err != nil {
 		t.Fatalf("decode json: %v\n%s", err, string(data))
 	}
+}
+
+func readRefreshCookieValue(t *testing.T, res *httptest.ResponseRecorder) string {
+	t.Helper()
+	for _, cookie := range res.Result().Cookies() {
+		if cookie.Name == refreshCookieName {
+			return cookie.Value
+		}
+	}
+	return ""
 }
 
 func repoPath(parts ...string) string {

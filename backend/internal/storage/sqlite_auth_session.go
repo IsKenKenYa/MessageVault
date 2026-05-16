@@ -88,6 +88,10 @@ func (s *sqliteProvider) FindAnyRefreshTokenByHash(ctx context.Context, tokenHas
 	return s.rowToRefreshToken(row), nil
 }
 
+func (s *sqliteProvider) HasActiveRefreshTokenChild(ctx context.Context, parentID string) (bool, error) {
+	return s.q.HasActiveRefreshTokenChild(ctx, sql.NullString{String: parentID, Valid: parentID != ""})
+}
+
 func (s *sqliteProvider) RevokeRefreshTokenFamily(ctx context.Context, tokenID string) error {
 	return s.q.RevokeRefreshTokenFamily(ctx, tokenID)
 }

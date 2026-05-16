@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+web_baseline_manifest="web/reference-baseline-paths.txt"
+
+is_web_baseline_path() {
+  local path="$1"
+  [[ -f "$web_baseline_manifest" ]] || return 1
+
+  while IFS= read -r prefix; do
+    [[ -n "$prefix" ]] || continue
+    [[ "$prefix" =~ ^# ]] && continue
+    if [[ "$path" == "$prefix"* ]]; then
+      return 0
+    fi
+  done < "$web_baseline_manifest"
+
+  return 1
+}
+
 is_handwritten_source() {
   local path="$1"
   case "$path" in
@@ -109,20 +126,30 @@ git diff --cached --name-only --diff-filter=ACMR >> "$tmp_candidates"
 git ls-files --others --exclude-standard >> "$tmp_candidates"
 
 oversized_sources=""
+baseline_oversized_sources=""
 while IFS= read -r path; do
   [[ -n "$path" ]] || continue
   is_handwritten_source "$path" || continue
   [[ -f "$path" ]] || continue
   lines="$(wc -l < "$path")"
   if (( lines > 500 )); then
-    oversized_sources+="${lines} ${path}"$'\n'
+    if is_web_baseline_path "$path"; then
+      baseline_oversized_sources+="${lines} ${path}"$'\n'
+    else
+      oversized_sources+="${lines} ${path}"$'\n'
+    fi
   fi
 done < <(sort -u "$tmp_candidates")
 
 if [[ -n "$oversized_sources" ]]; then
-  echo "Changed hand-written source files exceeded the 500-line hard limit:"
+  echo "Changed Commory-owned hand-written source files exceeded the 500-line hard limit:"
   echo "$oversized_sources" | sort -nr
   exit 1
+fi
+
+if [[ -n "$baseline_oversized_sources" ]]; then
+  echo "Reference-derived web baseline files exceeded 500 lines but were allowed by manifest ($web_baseline_manifest):"
+  echo "$baseline_oversized_sources" | sort -nr
 fi
 
 echo "Repo hygiene check passed."

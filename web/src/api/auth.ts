@@ -31,10 +31,9 @@ export function fetchGetUserInfo() {
   })
 }
 
-export function fetchRefreshToken(refreshToken: string) {
-  return request.post<Api.Auth.LoginResponse>({
+export function fetchRefreshToken() {
+  return request.post<Api.Auth.RefreshResponse>({
     url: '/api/auth/refresh',
-    params: { refreshToken },
     showErrorMessage: false
   })
 }

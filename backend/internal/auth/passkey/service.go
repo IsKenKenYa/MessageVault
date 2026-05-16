@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/IsKenKenYa/Commory/backend/internal/auth"
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -80,14 +82,14 @@ func (s *Service) BeginRegistration(ctx context.Context, userID string) (*protoc
 func (s *Service) FinishRegistration(ctx context.Context, userID, challengeID string, response *protocol.ParsedCredentialCreationData) error {
 	chal, err := s.store.GetChallenge(ctx, challengeID)
 	if err != nil {
-		return fmt.Errorf("challenge not found or expired")
+		return auth.ErrPasskeyChallengeExpired
 	}
 	_ = s.store.DeleteChallenge(ctx, challengeID)
 
 	var sessionData webauthn.SessionData
 	sessionJSON := decodeStoredBytes(chal.Challenge)
 	if err := json.Unmarshal(sessionJSON, &sessionData); err != nil {
-		return fmt.Errorf("invalid challenge data")
+		return auth.ErrOperationFailed
 	}
 
 	user, err := s.store.GetUser(ctx, userID)
@@ -99,7 +101,7 @@ func (s *Service) FinishRegistration(ctx context.Context, userID, challengeID st
 
 	credential, err := s.wa.CreateCredential(waUser, sessionData, response)
 	if err != nil {
-		return fmt.Errorf("verify registration: %w", err)
+		return auth.ErrPasskeyVerification
 	}
 
 	transportsJSON, _ := json.Marshal(response.Response.Transports)
@@ -153,25 +155,25 @@ func (s *Service) BeginLogin(ctx context.Context) (*protocol.CredentialAssertion
 func (s *Service) FinishLogin(ctx context.Context, challengeID string, response *protocol.ParsedCredentialAssertionData) (string, error) {
 	chal, err := s.store.GetChallenge(ctx, challengeID)
 	if err != nil {
-		return "", fmt.Errorf("challenge not found or expired")
+		return "", auth.ErrPasskeyChallengeExpired
 	}
 	_ = s.store.DeleteChallenge(ctx, challengeID)
 
 	var sessionData webauthn.SessionData
 	sessionJSON := decodeStoredBytes(chal.Challenge)
 	if err := json.Unmarshal(sessionJSON, &sessionData); err != nil {
-		return "", fmt.Errorf("invalid challenge data")
+		return "", auth.ErrOperationFailed
 	}
 
 	handler := func(rawID, userHandle []byte) (webauthn.User, error) {
 		credID := encodeStoredBytes(rawID)
 		cred, err := s.store.GetPasskeyByCredentialID(ctx, credID)
 		if err != nil {
-			return nil, fmt.Errorf("credential not found")
+			return nil, errors.New("credential not found")
 		}
 		user, err := s.store.GetUser(ctx, cred.UserID)
 		if err != nil {
-			return nil, fmt.Errorf("user not found")
+			return nil, errors.New("user not found")
 		}
 		creds, _ := s.store.ListPasskeysByUser(ctx, user.ID)
 		return NewWebAuthnUser(user, creds), nil
@@ -179,7 +181,7 @@ func (s *Service) FinishLogin(ctx context.Context, challengeID string, response 
 
 	credential, err := s.wa.ValidateDiscoverableLogin(handler, sessionData, response)
 	if err != nil {
-		return "", fmt.Errorf("verify login: %w", err)
+		return "", auth.ErrPasskeyVerification
 	}
 
 	credID := encodeStoredBytes(credential.ID)

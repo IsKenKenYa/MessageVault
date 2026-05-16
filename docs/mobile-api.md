@@ -34,17 +34,36 @@ JSON API 响应使用：
 
 - `POST /api/auth/register`
 - Body：`{ "userName": "alice", "email": "alice@example.com", "password": "..." }`
-- Response data：`{ "user": User, "token": "access", "refreshToken": "refresh" }`
+- Response data：`{ "user": User, "token": "access" }`
+- 同时通过 `Set-Cookie: commory_refresh_token=...; HttpOnly; SameSite=Strict` 下发 refresh cookie。
 
 - `POST /api/auth/login`
 - Body：`{ "userName": "alice", "password": "..." }`
-- Response data 与 register 一致。
+- Response data 与 register 一致，refresh token 同样只通过 cookie 返回。
 
 - `POST /api/auth/refresh`
-- Body：`{ "refreshToken": "refresh" }`
-- Response data：`{ "token": "access", "refreshToken": "refresh" }`
+- Android / Web 第一方客户端默认不传 body，直接依赖 refresh cookie。
+- 服务端仍兼容 body 里的 `refreshToken` 作为过渡输入，但不会再在响应体返回 refresh token。
+- Response data：`{ "token": "access" }`
+- 若旧 refresh token 因并发第二次消费命中短暂竞争，服务端返回 `409 ERR_REFRESH_TOKEN_RETRY`；客户端应立刻重试一次。
+
+- `POST /api/auth/logout`
+- Android / Web 第一方客户端默认不传 body，直接依赖 refresh cookie。
+- 服务端会清除 refresh cookie。
 
 Android 通过 `Authorization: Bearer <access token>` 发送认证请求。
+
+公开 auth 错误 `msg` 统一使用稳定错误码，例如：
+
+- `ERR_INVALID_REQUEST`
+- `ERR_INVALID_CREDENTIALS`
+- `ERR_USERNAME_EXISTS`
+- `ERR_TOO_MANY_LOGIN_ATTEMPTS`
+- `ERR_REFRESH_TOKEN_REQUIRED`
+- `ERR_REFRESH_TOKEN_EXPIRED`
+- `ERR_REFRESH_TOKEN_REPLAYED`
+- `ERR_REFRESH_TOKEN_RETRY`
+- `ERR_UNAUTHORIZED`
 
 ## User
 

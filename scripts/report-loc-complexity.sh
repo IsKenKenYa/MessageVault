@@ -1,9 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+web_baseline_manifest="web/reference-baseline-paths.txt"
+
+is_web_baseline_path() {
+  local path="$1"
+  [[ -f "$web_baseline_manifest" ]] || return 1
+
+  while IFS= read -r prefix; do
+    [[ -n "$prefix" ]] || continue
+    [[ "$prefix" =~ ^# ]] && continue
+    if [[ "$path" == "$prefix"* ]]; then
+      return 0
+    fi
+  done < "$web_baseline_manifest"
+
+  return 1
+}
+
 tmp_handwritten="$(mktemp)"
 tmp_generated="$(mktemp)"
-trap 'rm -f "$tmp_handwritten" "$tmp_generated"' EXIT
+tmp_commory_owned="$(mktemp)"
+tmp_web_baseline="$(mktemp)"
+trap 'rm -f "$tmp_handwritten" "$tmp_generated" "$tmp_commory_owned" "$tmp_web_baseline"' EXIT
 
 find backend android web -type f \( \
   -name '*.go' -o \
@@ -46,9 +65,22 @@ find android backend web msglayer -type f \( \
 echo "Largest hand-written source files by line count:"
 head -30 "$tmp_handwritten"
 
+while read -r lines path; do
+  [[ -n "$lines" && -n "$path" ]] || continue
+  if is_web_baseline_path "$path"; then
+    echo "$lines $path" >> "$tmp_web_baseline"
+  else
+    echo "$lines $path" >> "$tmp_commory_owned"
+  fi
+done < "$tmp_handwritten"
+
 echo
-echo "Hand-written source warning threshold: 350 lines. Hard limit: 500 lines."
-awk '$1 > 350 { print }' "$tmp_handwritten" || true
+echo "Commory-owned hand-written source warning threshold: 350 lines. Hard limit: 500 lines."
+awk '$1 > 350 { print }' "$tmp_commory_owned" || true
+
+echo
+echo "Reference-derived web baseline over 350 lines (tracked via $web_baseline_manifest):"
+awk '$1 > 350 { print }' "$tmp_web_baseline" || true
 
 echo
 echo "Generated/schema/resource review threshold: 1000 lines."

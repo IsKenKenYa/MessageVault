@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
-	"strings"
 )
 
 type contextKey string
@@ -27,14 +27,9 @@ func SessionIDFromContext(ctx context.Context) string {
 
 func Middleware(service *Service, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
-		if authHeader == "" {
-			http.Error(w, "missing authorization header", http.StatusUnauthorized)
-			return
-		}
-		claims, err := service.ParseAccessTokenClaims(authHeader)
+		claims, err := service.AuthenticateRequest(r.Context(), r.Header.Get("Authorization"))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			writeUnauthorized(w)
 			return
 		}
 		ctx := context.WithValue(r.Context(), userIDContextKey, claims.UserID)
@@ -42,5 +37,15 @@ func Middleware(service *Service, next http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, sessionIDContextKey, claims.SessionID)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func writeUnauthorized(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": http.StatusUnauthorized,
+		"msg":  ErrUnauthorized.Error(),
+		"data": nil,
 	})
 }

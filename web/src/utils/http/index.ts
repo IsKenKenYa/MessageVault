@@ -28,7 +28,8 @@ const axiosInstance = axios.create({
   withCredentials: VITE_WITH_CREDENTIALS === 'true'
 })
 
-let refreshingPromise: Promise<Api.Auth.LoginResponse> | null = null
+let refreshingPromise: Promise<Api.Auth.RefreshResponse> | null = null
+const REFRESH_RETRY_ERROR = 'ERR_REFRESH_TOKEN_RETRY'
 
 axiosInstance.interceptors.request.use(
   (request: InternalAxiosRequestConfig) => {
@@ -103,29 +104,19 @@ function createHttpError(message: string, code: number) {
   return new HttpError(message, code)
 }
 
-async function refreshAccessToken(): Promise<Api.Auth.LoginResponse> {
+async function refreshAccessToken(): Promise<Api.Auth.RefreshResponse> {
   if (refreshingPromise) {
     return refreshingPromise
   }
 
   const userStore = useUserStore()
-  if (!userStore.refreshToken) {
+  if (!userStore.isLogin) {
     throw createHttpError($t('httpMsg.unauthorized'), ApiStatus.unauthorized)
   }
 
-  refreshingPromise = axios
-    .post<BaseResponse<Api.Auth.LoginResponse>>(
-      '/api/auth/refresh',
-      { refreshToken: userStore.refreshToken },
-      {
-        baseURL: VITE_API_URL,
-        timeout: REQUEST_TIMEOUT,
-        withCredentials: VITE_WITH_CREDENTIALS === 'true'
-      }
-    )
-    .then((response) => {
-      const payload = response.data.data
-      userStore.setToken(payload.token, payload.refreshToken)
+  refreshingPromise = requestRefreshToken()
+    .then((payload) => {
+      userStore.setToken(payload.token)
       userStore.setLoginStatus(true)
       return payload
     })
@@ -134,6 +125,37 @@ async function refreshAccessToken(): Promise<Api.Auth.LoginResponse> {
     })
 
   return refreshingPromise
+}
+
+async function requestRefreshToken(): Promise<Api.Auth.RefreshResponse> {
+  try {
+    return await postRefreshToken()
+  } catch (error) {
+    if (isRefreshRetryError(error)) {
+      return postRefreshToken()
+    }
+    throw handleError(error as AxiosError<any>)
+  }
+}
+
+async function postRefreshToken(): Promise<Api.Auth.RefreshResponse> {
+  const response = await axios.post<BaseResponse<Api.Auth.RefreshResponse>>(
+    '/api/auth/refresh',
+    undefined,
+    {
+      baseURL: VITE_API_URL,
+      timeout: REQUEST_TIMEOUT,
+      withCredentials: VITE_WITH_CREDENTIALS === 'true'
+    }
+  )
+  return response.data.data
+}
+
+function isRefreshRetryError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) {
+    return false
+  }
+  return error.response?.status === 409 && error.response?.data?.msg === REFRESH_RETRY_ERROR
 }
 
 function forceLogout() {

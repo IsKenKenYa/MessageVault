@@ -95,6 +95,7 @@ CI 或 review 中使用 `bash scripts/sync-agent-skills.sh --check` 确认 `.cla
 - 治理：本文件、`AGENTS.md`、CI workflow、scripts、skills。
 
 除非能消除真实重复或澄清跨模块契约，否则不要新增共享抽象。大文件或大 diff 需要拆分，或在 PR 中给出简短理由。
+
 - 当任务同时跨 Android、Backend、Web 时，优先拆成能独立验证的纵向切片：规则/文档、backend foundation、client parity、UI/运营面。
 - 如果某一切片尚未验证通过，不要继续向下堆叠新的跨边界能力。
 
@@ -104,7 +105,8 @@ CI 或 review 中使用 `bash scripts/sync-agent-skills.sh --check` 确认 `.cla
 - 新增代码默认先并入现有同职责文件；仅在跨职责、逼近阈值或能明显提升审阅边界时拆分。
 - 不要为了“拆分”制造 1 函数 / 1 类型微文件。新增紧耦合 helper 若总量低于约 `80` 行，默认并入同 feature 文件。
 - 手写业务源码进入重构警戒线为 `350` 行；超过后默认应拆分或在交付说明中给出简短理由。
-- 手写业务源码硬上限为 `500` 行；现有治理脚本默认对当前变更集中的超线文件直接失败，避免把历史超线文件与本轮修复强绑定。
+- 手写业务源码硬上限为 `500` 行；现有治理脚本默认对当前变更集中的 Commory-owned 超线文件直接失败，避免把历史超线文件与本轮修复强绑定。
+- Web 参考基线通过 `web/reference-baseline-paths.txt` 维护，覆盖从 `references/art-design-pro` 演化而来的路径前缀；这些 baseline 文件允许保留历史超线，但必须在复杂度报表里单列暴露。
 - 生成代码、schema、fixture、资源文件不纳入硬失败，但复杂度报告仍需暴露 `1000+` 文件，便于后续治理。
 - handler 层按认证、导入、查询、会话、审计等能力分组；auth 层按 orchestration、token、password、audit/rate-limit 分组；storage provider 按 import/query、auth/session、setup/passkey/support 分组；测试按行为域分组。
 - 跨 Android、Backend、Web 的改动必须同步评估契约、测试、文档和部署影响，并默认按纵向切片推进：先修契约与基础层，再补客户端，再补 UI/治理，避免单个不可审阅的大 diff。
@@ -137,8 +139,8 @@ bash scripts/sync-agent-skills.sh --check
 docker compose config
 ```
 
-- `bash scripts/check-repo-hygiene.sh` 会对当前变更集中的手写 `.go`、`.kt`、`.java`、`.ts`、`.tsx`、`.vue` 源码执行 `500` 行硬门禁。
-- `bash scripts/report-loc-complexity.sh` 会输出手写源码最大文件列表、`350+` 警戒清单，以及 `1000+` 的 generated/schema/resource 报告。
+- `bash scripts/check-repo-hygiene.sh` 会对当前变更集中的 Commory-owned 手写 `.go`、`.kt`、`.java`、`.ts`、`.tsx`、`.vue` 源码执行 `500` 行硬门禁，并按 `web/reference-baseline-paths.txt` 放行参考衍生的 Web baseline 文件。
+- `bash scripts/report-loc-complexity.sh` 会输出手写源码最大文件列表、Commory-owned `350+` 警戒清单、Web baseline `350+` 清单，以及 `1000+` 的 generated/schema/resource 报告。
 
 ## 发布检查
 

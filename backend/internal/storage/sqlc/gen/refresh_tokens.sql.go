@@ -63,6 +63,19 @@ func (q *Queries) FindAnyRefreshTokenByHash(ctx context.Context, tokenHash strin
 	return &i, err
 }
 
+const hasActiveRefreshTokenChild = `-- name: HasActiveRefreshTokenChild :one
+SELECT COUNT(*) > 0 AS has_active_child
+FROM refresh_tokens
+WHERE parent_id = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+`
+
+func (q *Queries) HasActiveRefreshTokenChild(ctx context.Context, parentID sql.NullString) (bool, error) {
+	row := q.db.QueryRowContext(ctx, hasActiveRefreshTokenChild, parentID)
+	var has_active_child bool
+	err := row.Scan(&has_active_child)
+	return has_active_child, err
+}
+
 const findRefreshTokenByHash = `-- name: FindRefreshTokenByHash :one
 SELECT id, user_id, token_hash, parent_id, expires_at, created_at, revoked_at FROM refresh_tokens
 WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP

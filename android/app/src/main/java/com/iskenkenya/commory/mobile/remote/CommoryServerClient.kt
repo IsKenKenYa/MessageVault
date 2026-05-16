@@ -1,8 +1,7 @@
 package com.iskenkenya.commory.mobile.remote
 
-import android.content.Context
-import android.util.Base64
 import android.os.Build
+import android.util.Base64
 import com.iskenkenya.commory.mobile.runtime.AppEnvironmentManager
 import com.iskenkenya.commory.mobile.runtime.AuthSession
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +11,7 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody
 import org.json.JSONObject
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -19,6 +19,7 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import android.content.Context
 
 class CommoryServerClient(
     private val context: Context,
@@ -27,10 +28,14 @@ class CommoryServerClient(
     private val serviceCache = ConcurrentHashMap<String, CommoryApiService>()
     private val refreshServiceCache = ConcurrentHashMap<String, CommoryApiService>()
     private val deviceName = buildDeviceName()
+    private val refreshCookieJar = CommoryRefreshCookieJar.persistent(context)
 
-    private val refreshClient = baseClientBuilder().build()
+    private val refreshClient = baseClientBuilder()
+        .cookieJar(refreshCookieJar)
+        .build()
 
     private val client = baseClientBuilder()
+        .cookieJar(refreshCookieJar)
         .authenticator { _, response ->
             if (responseCount(response) > 1 || response.request().url().encodedPath().contains("/api/auth/")) {
                 return@authenticator null
@@ -75,30 +80,24 @@ class CommoryServerClient(
 
     suspend fun checkSetup(baseUrl: String): Result<SetupStatusDto> = wrapCall {
         val response = service(baseUrl).getSetupStatus()
-        require(response.isSuccessful) { response.errorBody()?.string() ?: "setup request failed" }
-        response.body()?.data ?: error(response.body()?.msg ?: "missing setup payload")
+        response.requireEnvelope("setup request failed").data ?: error("missing setup payload")
     }
 
     suspend fun register(baseUrl: String, userName: String, email: String, password: String): Result<AuthSession> = wrapCall {
         val response = service(baseUrl).register(RegisterRequestDto(userName, email, password))
-        require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "register failed" }
-        response.body()?.data?.toSession() ?: error(response.body()?.msg ?: "missing register payload")
+        response.requireEnvelope("register failed").data?.toSession() ?: error("missing register payload")
     }
 
     suspend fun login(baseUrl: String, userName: String, password: String): Result<AuthSession> = wrapCall {
         val response = service(baseUrl).login(LoginRequestDto(userName, password))
-        require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "login failed" }
-        response.body()?.data?.toSession() ?: error(response.body()?.msg ?: "missing login payload")
+        response.requireEnvelope("login failed").data?.toSession() ?: error("missing login payload")
     }
 
-    suspend fun refresh(baseUrl: String, refreshToken: String, currentSession: AuthSession): Result<AuthSession> = wrapCall {
-        val response = refreshService(baseUrl).refresh(RefreshRequestDto(refreshToken))
-        require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "refresh failed" }
-        val pair = response.body()?.data ?: error(response.body()?.msg ?: "missing refresh payload")
+    suspend fun refresh(baseUrl: String, currentSession: AuthSession): Result<AuthSession> = wrapCall {
+        val pair = refreshTokenPair(baseUrl)
         val accessToken = pair.accessToken ?: pair.token ?: error("missing access token")
         currentSession.copy(
             accessToken = accessToken,
-            refreshToken = pair.refreshToken,
             accessTokenExpiresAtEpochSeconds = accessTokenExpiresAt(accessToken),
             sessionId = accessTokenSessionId(accessToken) ?: currentSession.sessionId,
             deviceName = currentSession.deviceName ?: deviceName
@@ -107,24 +106,26 @@ class CommoryServerClient(
 
     suspend fun logoutPersistedSession(): Result<Unit> = wrapCall {
         val environment = environmentManager.currentSnapshot()
-        val refreshToken = environment.authSession.refreshToken
-        if (!refreshToken.isNullOrBlank()) {
-            val response = refreshService(environment.serverUrl).logout(LogoutRequestDto(refreshToken))
-            require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "logout failed" }
+        try {
+            refreshService(environment.serverUrl).logout().requireEnvelope("logout failed")
+        } catch (throwable: Throwable) {
+            if (!throwable.isTerminalAuthFailure()) {
+                throw throwable
+            }
+        } finally {
+            refreshCookieJar.clear(environment.serverUrl)
+            environmentManager.clearSession()
         }
-        environmentManager.clearSession()
     }
 
     suspend fun userInfo(baseUrl: String, accessToken: String): Result<UserDto> = wrapCall {
         val response = service(baseUrl).getUserInfo(bearer(accessToken))
-        require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "user info failed" }
-        response.body()?.data ?: error(response.body()?.msg ?: "missing user payload")
+        response.requireEnvelope("user info failed").data ?: error("missing user payload")
     }
 
     suspend fun listImports(baseUrl: String, accessToken: String): Result<List<ImportSummaryDto>> = wrapCall {
         val response = service(baseUrl).listImports(bearer(accessToken))
-        require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "list imports failed" }
-        response.body()?.data ?: emptyList()
+        response.requireEnvelope("list imports failed").data ?: emptyList()
     }
 
     suspend fun uploadImport(baseUrl: String, accessToken: String, file: File): Result<ImportUploadResponseDto> = wrapCall {
@@ -132,13 +133,12 @@ class CommoryServerClient(
             RequestBody.create(MediaType.parse("application/json"), file.readBytes())
         }
         val response = service(baseUrl).uploadImport(bearer(accessToken), body)
-        require(response.isSuccessful) { response.body()?.msg ?: response.errorBody()?.string() ?: "upload failed" }
-        response.body()?.data ?: error(response.body()?.msg ?: "missing upload payload")
+        response.requireEnvelope("upload failed").data ?: error("missing upload payload")
     }
 
     suspend fun exportImport(baseUrl: String, accessToken: String, importId: String): Result<File> = wrapCall {
         val response = service(baseUrl).exportImport(bearer(accessToken), importId)
-        require(response.isSuccessful) { response.errorBody()?.string() ?: "export failed" }
+        response.requireSuccess("export failed")
         val body = response.body() ?: error("missing export body")
         val outDir = File(context.cacheDir, "remote-imports").apply { mkdirs() }
         val outFile = File(outDir, "$importId.json")
@@ -152,16 +152,15 @@ class CommoryServerClient(
 
     suspend fun refreshPersistedSession(): Result<AuthSession> = wrapCall {
         val environment = environmentManager.currentSnapshot()
-        val refreshToken = environment.authSession.refreshToken ?: error("missing refresh token")
-        val updated = refresh(environment.serverUrl, refreshToken, environment.authSession).getOrElse { throwable ->
+        val updated = refresh(environment.serverUrl, environment.authSession).getOrElse { throwable ->
             if (throwable.isTerminalAuthFailure()) {
+                refreshCookieJar.clear(environment.serverUrl)
                 environmentManager.clearSession()
             }
             throw throwable
         }
         val userResponse = refreshService(environment.serverUrl).getUserInfo(bearer(updated.accessToken ?: ""))
-        require(userResponse.isSuccessful) { userResponse.body()?.msg ?: userResponse.errorBody()?.string() ?: "user info failed" }
-        val user = userResponse.body()?.data ?: error(userResponse.body()?.msg ?: "missing user payload")
+        val user = userResponse.requireEnvelope("user info failed").data ?: error("missing user payload")
         val session = updated.copy(
             userId = user.id,
             userName = user.userName ?: user.user_name,
@@ -179,6 +178,19 @@ class CommoryServerClient(
     }
 
     private fun bearer(token: String): String = "Bearer $token"
+
+    private suspend fun refreshTokenPair(baseUrl: String): TokenPairDto {
+        try {
+            return refreshService(baseUrl).refresh().requireEnvelope("refresh failed").data
+                ?: error("missing refresh payload")
+        } catch (throwable: Throwable) {
+            if (throwable.isRefreshRetryConflict()) {
+                return refreshService(baseUrl).refresh().requireEnvelope("refresh failed").data
+                    ?: error("missing refresh payload")
+            }
+            throw throwable
+        }
+    }
 
     private suspend fun <T> wrapCall(block: suspend () -> T): Result<T> {
         return runCatching { block() }
@@ -200,7 +212,6 @@ class CommoryServerClient(
     private fun AuthResponseDto.toSession(): AuthSession {
         return AuthSession(
             accessToken = token,
-            refreshToken = refreshToken,
             accessTokenExpiresAtEpochSeconds = accessTokenExpiresAt(token),
             sessionId = accessTokenSessionId(token),
             deviceName = deviceName,
@@ -251,5 +262,44 @@ class CommoryServerClient(
     private fun Throwable.isTerminalAuthFailure(): Boolean {
         val network = this as? NetworkException ?: return false
         return network.error is NetworkError.Unauthorized
+    }
+
+    private fun Throwable.isRefreshRetryConflict(): Boolean {
+        val network = this as? NetworkException ?: return false
+        val server = network.error as? NetworkError.Server ?: return false
+        return server.statusCode == 409 && server.message == "ERR_REFRESH_TOKEN_RETRY"
+    }
+
+    private fun <T> retrofit2.Response<ApiEnvelope<T>>.requireEnvelope(fallbackMessage: String): ApiEnvelope<T> {
+        if (isSuccessful) {
+            return body() ?: error(fallbackMessage)
+        }
+        throw toNetworkException(fallbackMessage)
+    }
+
+    private fun retrofit2.Response<ResponseBody>.requireSuccess(fallbackMessage: String) {
+        if (!isSuccessful) {
+            throw toNetworkException(fallbackMessage)
+        }
+    }
+
+    private fun retrofit2.Response<*>.toNetworkException(fallbackMessage: String): NetworkException {
+        val message = responseMessage(fallbackMessage)
+        return when (code()) {
+            400 -> NetworkException(NetworkError.Validation(message))
+            401 -> NetworkException(NetworkError.Unauthorized(message))
+            else -> NetworkException(NetworkError.Server(code(), message))
+        }
+    }
+
+    private fun retrofit2.Response<*>.responseMessage(fallbackMessage: String): String {
+        val errorBodyString = runCatching { errorBody()?.string().orEmpty() }.getOrDefault("")
+        if (errorBodyString.isBlank()) {
+            return message().takeIf { it.isNotBlank() } ?: fallbackMessage
+        }
+        return runCatching { JSONObject(errorBodyString).optString("msg") }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: errorBodyString
     }
 }

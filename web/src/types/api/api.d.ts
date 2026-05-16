@@ -71,8 +71,11 @@ declare namespace Api {
     /** 登录响应 */
     interface LoginResponse {
       token: string
-      refreshToken: string
       user?: UserInfo
+    }
+
+    interface RefreshResponse {
+      token: string
     }
 
     interface RegisterParams {

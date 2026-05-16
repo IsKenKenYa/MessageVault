@@ -18,21 +18,20 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writePublicAuthError(w, auth.ErrInvalidRequest)
 		return
 	}
 	user, pair, err := s.auth.RegisterWithDevice(r.Context(), req.UserName, req.Email, req.Password,
 		r.Header.Get("X-Commory-Device"), r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		if auth.PublicErrorCode(err) == auth.ErrOperationFailed.Error() {
+			logAuthInternalError("register", err)
+		}
+		writePublicAuthError(w, err)
 		return
 	}
 	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
-	writeJSON(w, http.StatusCreated, "registered", map[string]any{
-		"user":         user,
-		"token":        pair.AccessToken,
-		"refreshToken": pair.RefreshToken,
-	})
+	writeJSON(w, http.StatusCreated, "registered", authResponse{User: user, Token: pair.AccessToken})
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -45,21 +44,20 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writePublicAuthError(w, auth.ErrInvalidRequest)
 		return
 	}
 	user, pair, err := s.auth.LoginWithDevice(r.Context(), r.RemoteAddr, req.UserName, req.Password,
 		r.Header.Get("X-Commory-Device"), r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"))
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
+		if auth.PublicErrorCode(err) == auth.ErrOperationFailed.Error() {
+			logAuthInternalError("login", err)
+		}
+		writePublicAuthError(w, err)
 		return
 	}
 	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
-	writeJSON(w, http.StatusOK, "ok", map[string]any{
-		"user":         user,
-		"token":        pair.AccessToken,
-		"refreshToken": pair.RefreshToken,
-	})
+	writeJSON(w, http.StatusOK, "ok", authResponse{User: user, Token: pair.AccessToken})
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
@@ -79,12 +77,17 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 	pair, err := s.auth.Refresh(r.Context(), refreshToken)
 	if err != nil {
-		clearRefreshCookie(w, s.cfg.TLS)
-		writeError(w, http.StatusUnauthorized, err.Error())
+		if err != auth.ErrRefreshTokenRetry {
+			clearRefreshCookie(w, s.cfg.TLS)
+		}
+		if auth.PublicErrorCode(err) == auth.ErrOperationFailed.Error() {
+			logAuthInternalError("refresh", err)
+		}
+		writePublicAuthError(w, err)
 		return
 	}
 	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
-	writeJSON(w, http.StatusOK, "ok", pair)
+	writeJSON(w, http.StatusOK, "ok", tokenResponse{Token: pair.AccessToken})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

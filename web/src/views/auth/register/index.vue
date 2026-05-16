@@ -214,12 +214,12 @@
       await formRef.value.validate()
       loading.value = true
 
-      const { token, refreshToken, user } = await fetchRegister({
+      const { token, user } = await fetchRegister({
         userName: formData.username,
         email: formData.email,
         password: formData.password
       })
-      userStore.setToken(token, refreshToken)
+      userStore.setToken(token)
       userStore.setLoginStatus(true)
       if (user) {
         userStore.setUserInfo(user)

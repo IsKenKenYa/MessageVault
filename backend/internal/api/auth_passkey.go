@@ -16,13 +16,14 @@ func (s *Server) handlePasskeyRegisterBegin(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if s.passkey == nil {
-		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		writeError(w, http.StatusServiceUnavailable, auth.ErrOperationFailed.Error())
 		return
 	}
 	userID := auth.UserIDFromContext(r.Context())
 	cc, challengeID, err := s.passkey.BeginRegistration(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		logAuthInternalError("passkey register begin", err)
+		writePublicAuthError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, "ok", map[string]any{
@@ -37,7 +38,7 @@ func (s *Server) handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if s.passkey == nil {
-		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		writeError(w, http.StatusServiceUnavailable, auth.ErrOperationFailed.Error())
 		return
 	}
 	userID := auth.UserIDFromContext(r.Context())
@@ -46,17 +47,20 @@ func (s *Server) handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Requ
 		Response    any    `json:"response"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writePublicAuthError(w, auth.ErrInvalidRequest)
 		return
 	}
 	respJSON, _ := json.Marshal(req.Response)
 	parsed, err := protocol.ParseCredentialCreationResponseBody(strings.NewReader(string(respJSON)))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid response: %v", err))
+		writePublicAuthError(w, auth.ErrPasskeyInvalidResponse)
 		return
 	}
 	if err := s.passkey.FinishRegistration(r.Context(), userID, req.ChallengeID, parsed); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		if auth.PublicErrorCode(err) == auth.ErrOperationFailed.Error() {
+			logAuthInternalError("passkey register finish", err)
+		}
+		writePublicAuthError(w, err)
 		return
 	}
 	_ = s.auth.WriteAuditLog(r.Context(), userID, "passkey_register", r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"), "")
@@ -69,12 +73,13 @@ func (s *Server) handlePasskeyLoginBegin(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if s.passkey == nil {
-		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		writeError(w, http.StatusServiceUnavailable, auth.ErrOperationFailed.Error())
 		return
 	}
 	assertion, challengeID, err := s.passkey.BeginLogin(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		logAuthInternalError("passkey login begin", err)
+		writePublicAuthError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, "ok", map[string]any{
@@ -89,7 +94,7 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if s.passkey == nil {
-		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		writeError(w, http.StatusServiceUnavailable, auth.ErrOperationFailed.Error())
 		return
 	}
 	var req struct {
@@ -97,28 +102,33 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 		Response    any    `json:"response"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writePublicAuthError(w, auth.ErrInvalidRequest)
 		return
 	}
 	respJSON, _ := json.Marshal(req.Response)
 	parsed, err := protocol.ParseCredentialRequestResponseBody(strings.NewReader(string(respJSON)))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid response: %v", err))
+		writePublicAuthError(w, auth.ErrPasskeyInvalidResponse)
 		return
 	}
 	userID, err := s.passkey.FinishLogin(r.Context(), req.ChallengeID, parsed)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
+		if auth.PublicErrorCode(err) == auth.ErrOperationFailed.Error() {
+			logAuthInternalError("passkey login finish", err)
+		}
+		writePublicAuthError(w, err)
 		return
 	}
 	user, err := s.auth.UserInfo(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		logAuthInternalError("passkey user info", err)
+		writePublicAuthError(w, auth.ErrOperationFailed)
 		return
 	}
 	userRecord, err := s.store.GetUser(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		logAuthInternalError("passkey get user", err)
+		writePublicAuthError(w, auth.ErrOperationFailed)
 		return
 	}
 	pair, _, err := s.auth.IssueTokenPairForUser(
@@ -129,16 +139,13 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 		r.Header.Get("User-Agent"),
 	)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		logAuthInternalError("passkey issue token", err)
+		writePublicAuthError(w, auth.ErrOperationFailed)
 		return
 	}
 	_ = s.auth.WriteAuditLog(r.Context(), userID, "login", r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"), `{"method":"passkey"}`)
 	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
-	writeJSON(w, http.StatusOK, "ok", map[string]any{
-		"user":         user,
-		"token":        pair.AccessToken,
-		"refreshToken": pair.RefreshToken,
-	})
+	writeJSON(w, http.StatusOK, "ok", authResponse{User: user, Token: pair.AccessToken})
 }
 
 func (s *Server) handlePasskeys(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +154,7 @@ func (s *Server) handlePasskeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.passkey == nil {
-		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		writeError(w, http.StatusServiceUnavailable, auth.ErrOperationFailed.Error())
 		return
 	}
 	userID := auth.UserIDFromContext(r.Context())
@@ -165,7 +172,7 @@ func (s *Server) handlePasskeyDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.passkey == nil {
-		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		writeError(w, http.StatusServiceUnavailable, auth.ErrOperationFailed.Error())
 		return
 	}
 	passkeyID := strings.TrimPrefix(r.URL.Path, "/api/auth/passkey/")

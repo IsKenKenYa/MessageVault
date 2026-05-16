@@ -102,6 +102,21 @@ func (s *fileStore) FindAnyRefreshTokenByHash(_ context.Context, tokenHash strin
 	return RefreshTokenRecord{}, fmt.Errorf("refresh token not found")
 }
 
+func (s *fileStore) HasActiveRefreshTokenChild(_ context.Context, parentID string) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now().UTC()
+	for _, token := range s.snapshot.RefreshTokens {
+		if token.ParentID != parentID {
+			continue
+		}
+		if token.RevokedAt.IsZero() && token.ExpiresAt.After(now) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *fileStore) RevokeRefreshTokenFamily(_ context.Context, tokenID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
