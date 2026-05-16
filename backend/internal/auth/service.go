@@ -12,7 +12,7 @@ import (
 
 const (
 	accessTokenTTL  = 15 * time.Minute
-	refreshTokenTTL = 7 * 24 * time.Hour
+	RefreshTokenTTL = 7 * 24 * time.Hour
 )
 
 type Service struct {

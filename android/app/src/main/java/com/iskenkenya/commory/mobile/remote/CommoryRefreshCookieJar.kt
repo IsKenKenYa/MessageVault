@@ -49,7 +49,6 @@ class CommoryRefreshCookieJar(
                 .expiresAt(stored.expiresAt)
                 .apply {
                     if (stored.secure) secure()
-                    httpOnly()
                 }
                 .build()
         )

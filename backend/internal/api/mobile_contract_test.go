@@ -159,8 +159,15 @@ func TestMobileLogoutRevokesRefreshToken(t *testing.T) {
 	if logoutRes.Code != http.StatusOK {
 		t.Fatalf("logout status = %d, body = %s", logoutRes.Code, logoutRes.Body.String())
 	}
-	if cookieHeader := logoutRes.Header().Get("Set-Cookie"); !bytes.Contains([]byte(cookieHeader), []byte("SameSite=Strict")) {
+	cookieHeader := logoutRes.Header().Get("Set-Cookie")
+	if !bytes.Contains([]byte(cookieHeader), []byte("SameSite=Strict")) {
 		t.Fatalf("expected logout clear cookie to keep SameSite=Strict, got %q", cookieHeader)
+	}
+	if !bytes.Contains([]byte(cookieHeader), []byte("Max-Age=0")) {
+		t.Fatalf("expected logout clear cookie to reset Max-Age, got %q", cookieHeader)
+	}
+	if !bytes.Contains([]byte(cookieHeader), []byte("Expires=")) {
+		t.Fatalf("expected logout clear cookie to include Expires, got %q", cookieHeader)
 	}
 
 	refreshReq := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)

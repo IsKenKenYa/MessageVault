@@ -31,13 +31,6 @@ export function fetchGetUserInfo() {
   })
 }
 
-export function fetchRefreshToken() {
-  return request.post<Api.Auth.RefreshResponse>({
-    url: '/api/auth/refresh',
-    showErrorMessage: false
-  })
-}
-
 export function fetchLogout() {
   return request.post<{ success: boolean }>({
     url: '/api/auth/logout',

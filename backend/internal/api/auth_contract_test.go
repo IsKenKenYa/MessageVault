@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,6 +44,28 @@ func TestMobileAuthRegisterUsesCookieOnlyRefreshContract(t *testing.T) {
 	if token := readRefreshCookieValue(t, res); token == "" {
 		t.Fatal("expected refresh cookie to be set")
 	}
+	assertPersistentRefreshCookie(t, res)
+}
+
+func TestMobileAuthLoginUsesPersistentRefreshCookie(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	registerMobileSession(t, handler, "login-cookie-user", "login-cookie@example.com")
+
+	payload := mustJSON(t, map[string]string{
+		"userName": "login-cookie-user",
+		"password": "passw0rd!",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("login status = %d, body = %s", res.Code, res.Body.String())
+	}
+	if token := readRefreshCookieValue(t, res); token == "" {
+		t.Fatal("expected refresh cookie to be set on login")
+	}
+	assertPersistentRefreshCookie(t, res)
 }
 
 func TestMobileRefreshRetryAllowsImmediateRetry(t *testing.T) {
@@ -146,6 +169,27 @@ func TestAuthMiddlewareRejectsRevokedSessionAndThrottlesLastSeen(t *testing.T) {
 	}
 	if !recentAfter.LastSeenAt.Equal(recentBefore.LastSeenAt) {
 		t.Fatal("expected recent session last_seen_at to remain unchanged inside throttle window")
+	}
+}
+
+func TestUserInfoMissingUserUsesUnauthorizedEnvelope(t *testing.T) {
+	handler, store := newFileBackedTestServer(t, false)
+
+	missingUserID := "user_missing"
+	sessionID := "session-missing-user"
+	lastSeenAt := time.Now().UTC().Add(-10 * time.Minute)
+	createAuthTestSession(t, store, missingUserID, sessionID, lastSeenAt)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/info", nil)
+	req.Header.Set("Authorization", "Bearer "+buildTestAccessToken(t, "test-secret", missingUserID, sessionID, time.Now().Add(time.Hour)))
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("user info status = %d, body = %s", res.Code, res.Body.String())
+	}
+	assertEnvelopeMessage(t, res.Body.Bytes(), "ERR_UNAUTHORIZED")
+	if strings.Contains(res.Body.String(), "not found") {
+		t.Fatalf("expected user info response to hide storage error, got %s", res.Body.String())
 	}
 }
 
@@ -255,5 +299,16 @@ func assertEnvelopeMessage(t *testing.T, body []byte, want string) {
 	decodeJSON(t, body, &envelope)
 	if envelope.Msg != want {
 		t.Fatalf("expected msg %q, got %q", want, envelope.Msg)
+	}
+}
+
+func assertPersistentRefreshCookie(t *testing.T, res *httptest.ResponseRecorder) {
+	t.Helper()
+	cookieHeader := res.Header().Get("Set-Cookie")
+	if !strings.Contains(cookieHeader, "Max-Age=604800") {
+		t.Fatalf("expected persistent refresh cookie Max-Age, got %q", cookieHeader)
+	}
+	if !strings.Contains(cookieHeader, "Expires=") {
+		t.Fatalf("expected persistent refresh cookie Expires, got %q", cookieHeader)
 	}
 }

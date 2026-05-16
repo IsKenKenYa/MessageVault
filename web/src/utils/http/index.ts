@@ -20,12 +20,12 @@ interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
   _retry?: boolean
 }
 
-const { VITE_API_URL, VITE_WITH_CREDENTIALS } = import.meta.env
+const { VITE_API_URL } = import.meta.env
 
 const axiosInstance = axios.create({
   timeout: REQUEST_TIMEOUT,
   baseURL: VITE_API_URL,
-  withCredentials: VITE_WITH_CREDENTIALS === 'true'
+  withCredentials: true
 })
 
 let refreshingPromise: Promise<Api.Auth.RefreshResponse> | null = null
@@ -145,7 +145,7 @@ async function postRefreshToken(): Promise<Api.Auth.RefreshResponse> {
     {
       baseURL: VITE_API_URL,
       timeout: REQUEST_TIMEOUT,
-      withCredentials: VITE_WITH_CREDENTIALS === 'true'
+      withCredentials: true
     }
   )
   return response.data.data

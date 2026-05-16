@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/IsKenKenYa/Commory/backend/internal/auth"
 )
 
 const refreshCookieName = "commory_refresh_token"
@@ -48,10 +51,13 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 }
 
 func setRefreshCookie(w http.ResponseWriter, token string, secure bool) {
+	expiresAt := time.Now().UTC().Add(auth.RefreshTokenTTL)
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    token,
 		Path:     "/",
+		MaxAge:   int(auth.RefreshTokenTTL.Seconds()),
+		Expires:  expiresAt,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 		Secure:   secure,
@@ -64,6 +70,7 @@ func clearRefreshCookie(w http.ResponseWriter, secure bool) {
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
+		Expires:  time.Unix(0, 0).UTC(),
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 		Secure:   secure,

@@ -105,7 +105,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 			refreshToken = cookie.Value
 		}
 	}
-	_ = s.auth.RevokeRefreshToken(r.Context(), refreshToken)
+	if refreshToken != "" {
+		if err := s.auth.RevokeRefreshToken(r.Context(), refreshToken); err != nil {
+			logAuthInternalError("logout revoke", err)
+		}
+	}
 	clearRefreshCookie(w, s.cfg.TLS)
 	writeJSON(w, http.StatusOK, "logged out", map[string]any{"success": true})
 }
@@ -114,7 +118,10 @@ func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	user, err := s.auth.UserInfo(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
+		if auth.PublicErrorCode(err) == auth.ErrOperationFailed.Error() {
+			logAuthInternalError("user info", err)
+		}
+		writePublicAuthError(w, auth.ErrUnauthorized)
 		return
 	}
 	writeJSON(w, http.StatusOK, "ok", user)

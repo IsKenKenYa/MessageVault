@@ -87,7 +87,7 @@ func (s *Service) issueTokenPairWithSession(ctx context.Context, user storage.Us
 		UserID:    user.ID,
 		TokenHash: refreshHash,
 		ParentID:  parentID,
-		ExpiresAt: time.Now().UTC().Add(refreshTokenTTL),
+		ExpiresAt: time.Now().UTC().Add(RefreshTokenTTL),
 		CreatedAt: time.Now().UTC(),
 	}); err != nil {
 		return TokenPair{}, "", err
