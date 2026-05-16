@@ -10,6 +10,7 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - Web dashboard 工作：`web/package.json`、`web/src/api`、`web/src/router`，以及目标 view/store 模块。
 - MsgLayer/schema 工作：`msglayer/schema/v0.1/root.schema.json`、`msglayer/examples`，以及 `backend/internal/msglayer`。
 - 治理或 CI 工作：`docs/engineering-standards.md`、`.github/workflows/ci.yml`、`scripts/`、`.agents/skills`、`.claude/skills`。
+- Docker/部署工作：`Dockerfile`、`docker-compose.yml`、`.env.example`、backend config、web production env。
 
 ## 上下文包
 
@@ -19,6 +20,7 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - Web dashboard 包：API client、auth store、route guard、目标 view，以及 `web/` 已使用的 Element Plus patterns。
 - MsgLayer 包：schema、examples、validators、Android mapper/serializer。
 - 治理包：engineering standards、CI workflow、repo hygiene、skills sync、i18n check。
+- 部署包：Dockerfile、Compose、环境变量、backend static handler、Web build 输出。
 
 只加载任务需要的上下文包。不要把临时决策扩散到工具专属文件；长期规则放在 `docs/engineering-standards.md`，Agent 入口放在本文件，发布历史放在 `CHANGELOG.md`。
 
@@ -29,6 +31,14 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - `.agents/skills` 是项目 skills 的唯一手工维护来源。
 - `.claude/skills` 是 Claude Code 兼容镜像，由脚本生成。不要手改；运行 `bash scripts/sync-agent-skills.sh`。
 - 不要新增 `AI_EDIT_LOG.md`、调试报告、已追踪日志、构建产物、`.DS_Store` 或 IDE/cache 文件。
+
+## 项目管理
+
+- `CHANGELOG.md` 记录用户可见变更、兼容性影响和迁移说明；当前版本采用 `v0.x.y`。
+- `docs/project-management.md` 定义发布、分支、PR 和两审合并规则。
+- `docs/technical-debt.md` 记录已知技术债，不要把无关债务混入功能 PR。
+- 禁止直接推送 `main`；`feat/*` 用于功能，`fix/*` 用于修复。
+- 跨 Android、Backend、Web、MsgLayer、Agent、Docker 的变更必须同步评估契约、文档、测试和部署影响。
 
 ## 命名
 
@@ -48,6 +58,19 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - 不要翻译代码标识符、JSON key、数据库字段名、HTTP endpoint、配置项、命令、包名、常量值和公开契约。
 - `README.en.md` 是英文 README，保持英文；中文 README 更新了产品能力时，同步检查英文 README 是否需要对应更新。
 
+## Web Dashboard
+
+- Web UI 以 `references/art-design-pro` 为模板基线，以 `references/memos/web` 为产品组织参考；只学习结构，不复制参考源码。
+- 新 Web 页面必须满足中英 i18n、dark mode、主题变量、ECharts 配色、布局密度和 Element Plus 使用规范。
+- 具体规则见 `docs/web-dashboard-guidelines.md`。
+
+## 部署
+
+- 默认部署形态是单端口：Go backend 同时提供 `/api/*` 和 Web 静态资源。
+- 生产镜像使用根目录 `Dockerfile`；不要新增 `Dockerfile.backend` 或 `web/Dockerfile`，除非后续明确拆分企业部署。
+- `docker-compose.yml` 只暴露一个外部端口，默认 `3000:3000`，避免 CORS 成为默认复杂度。
+- Web production API 使用同源 `/`，开发环境继续通过 Vite proxy 转发 `/api`。
+
 ## Skills
 
 项目 skills 必须遵循 Codex skill 形态：
@@ -65,3 +88,4 @@ Commory 是一个本地优先的通信记忆 monorepo。工作时保持上下文
 - Android：`cd android && ./gradlew :app:compileDebugKotlin && ./gradlew :app:testDebugUnitTest`。
 - Web：`cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm build`。
 - 治理：`bash scripts/check-repo-hygiene.sh`、`bash scripts/check-android-i18n.sh`、`bash scripts/sync-agent-skills.sh --check`、`bash scripts/report-loc-complexity.sh`。
+- Docker：`docker compose config`、`docker compose build`，必要时 `docker compose up` 后检查 `/` 与 `/api/setup`。

@@ -11,6 +11,7 @@
 - Backend handler 保持薄层：解析 HTTP、调用 auth/storage/query/import/setup service、返回 envelope。
 - Web 负责 server-backed dashboard workflow，并遵循 `web/` 现有 Vue 3、Vite、Pinia、Element Plus 模式。
 - MsgLayer schema 是 Android、backend、web 和未来 agent 之间的 canonical interchange format。
+- 默认部署形态是单端口：Go backend 同时提供 `/api/*` 和 Web 静态资源。
 
 ## 命名
 
@@ -28,6 +29,14 @@
 - `.claude/skills` 由 `.agents/skills` 生成，用于 Claude Code 兼容。
 - 不要新增已追踪构建产物、日志、`.DS_Store`、IDE 文件、调试报告或 `AI_EDIT_LOG.md`。
 
+## 项目管理
+
+- 发布记录写入 `CHANGELOG.md`，版本采用 `v0.x.y`。
+- PR 使用 `.github/pull_request_template.md`，说明影响范围、测试、契约、i18n、隐私、本地模式和 Docker 影响。
+- 分支策略：`main` 稳定且 CI 全绿，功能使用 `feat/*`，修复使用 `fix/*`，禁止直接推送 `main`。
+- 跨 Android、Backend、Web、MsgLayer、Agent、Docker 的变更必须同步评估，并在 PR 中说明。
+- 技术债记录在 `docs/technical-debt.md`，不要在无关 PR 中顺手改。
+
 ## 中文优先与国际化
 
 - 文档、Rules、代码注释、维护者提示、测试失败信息和数据库备注中文优先。
@@ -39,6 +48,19 @@
 - 系统内置国际化只负责中文和英文；其它语言留给社区扩展。
 - 不要翻译代码标识符、JSON key、数据库字段名、HTTP endpoint、配置项、命令、包名、常量值和公开契约。
 - `README.md` 是中文优先入口；`README.en.md` 保持英文镜像。
+
+## Web Dashboard
+
+- Web UI 以 `references/art-design-pro` 为模板基线，`references/memos/web` 仅作产品组织参考。
+- 新页面必须遵循 `docs/web-dashboard-guidelines.md`，满足中英 i18n、dark mode、主题变量、ECharts 配色、布局密度和 Element Plus 规范。
+- `web/.env.production` 默认使用同源 API，不得恢复到 mock 服务作为生产默认值。
+
+## Docker 与部署
+
+- 根目录 `Dockerfile` 构建完整 Commory 镜像：Web static assets、Go backend、MsgLayer schema。
+- `docker-compose.yml` 默认只暴露一个端口，使用 file-backed sqlite 开发存储。
+- `COMMORY_WEB_ROOT` 指向 Web 静态资源目录；非 `/api` 请求 fallback 到 `index.html` 支持 SPA refresh。
+- `/api/*` 必须保持 API 行为，不得 fallback 到 Web index。
 
 ## Skills
 
@@ -94,6 +116,7 @@ cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm build
 bash scripts/check-repo-hygiene.sh
 bash scripts/check-android-i18n.sh
 bash scripts/sync-agent-skills.sh --check
+docker compose config
 ```
 
 ## 发布检查
@@ -104,3 +127,4 @@ bash scripts/sync-agent-skills.sh --check
 - Android locale keys 完整。
 - 跨边界 API/schema 变更包含文档和测试。
 - Changelog 说明用户可见变更和兼容性变化。
+- 单端口部署中 `/`、SPA route 和 `/api/setup` 均可访问，且无 CORS 错误。

@@ -1,0 +1,23 @@
+services:
+  commory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: commory:local
+    container_name: commory
+    restart: unless-stopped
+    ports:
+      - "${COMMORY_HTTP_PORT:-3000}:3000"
+    environment:
+      COMMORY_LISTEN_ADDR: ":3000"
+      COMMORY_DB_DRIVER: sqlite
+      COMMORY_DB_DSN: /data/commory-store.json
+      COMMORY_SCHEMA_ROOT: /app/msglayer/schema/v0.1/root.schema.json
+      COMMORY_WEB_ROOT: /app/web
+      COMMORY_AUTH_SECRET: ${COMMORY_AUTH_SECRET:-change-me}
+      COMMORY_ENV: ${COMMORY_ENV:-development}
+    volumes:
+      - commory_data:/data
+
+volumes:
+  commory_data:

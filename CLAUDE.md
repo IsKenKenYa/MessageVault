@@ -19,12 +19,21 @@ bash scripts/sync-agent-skills.sh
 - 产品中的用户可见文案必须走 i18n/resource，不要在代码里硬编码中文。
 - `README.en.md` 保持英文，中文 README 是主要维护入口。
 
+## 部署与 Web
+
+- 默认部署是单端口：Go backend 同时提供 `/api/*` 和 Web 静态资源。
+- 根目录 `Dockerfile` 是完整 Commory 镜像；`docker-compose.yml` 默认只暴露 `3000`。
+- Web UI 必须遵循 `docs/web-dashboard-guidelines.md`，以 `references/art-design-pro` 为模板基线。
+- 多端功能必须同步评估 Android、Backend、Web、MsgLayer、Agent 和 Docker/部署影响。
+
 ## 常用命令
 
 ```bash
+bash scripts/dev.sh                    # 一键启动 backend (:3000) + web (:3006)
 bash scripts/check-repo-hygiene.sh
 bash scripts/check-android-i18n.sh
 bash scripts/sync-agent-skills.sh --check
+docker compose config
 ```
 
 代码工作使用 `AGENTS.md` 中列出的验证命令。

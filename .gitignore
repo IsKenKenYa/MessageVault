@@ -11,6 +11,8 @@ Thumbs.db
 # Environment
 .env
 .env.*
+!.env.example
+!web/.env.production
 
 # Android
 android/.gradle/

@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseURL      string
 	ListenAddr       string
 	SchemaRoot       string
+	WebRoot          string
 	AuthSecret       string
 	TLS              bool
 	Env              string
@@ -31,11 +32,22 @@ func Load() (Config, error) {
 		DatabaseURL:      env("COMMORY_DATABASE_URL", ""),
 		ListenAddr:       env("COMMORY_LISTEN_ADDR", ":3000"),
 		SchemaRoot:       schemaRoot,
+		WebRoot:          absPath(env("COMMORY_WEB_ROOT", "")),
 		AuthSecret:       env("COMMORY_AUTH_SECRET", "commory-dev-secret"),
 		TLS:              envBool("COMMORY_TLS", false),
 		Env:              env("COMMORY_ENV", "development"),
 		AllowedImportDir: splitAndClean(env("COMMORY_ALLOWED_IMPORT_DIRS", filepath.Join("..", "msglayer", "examples"))),
 	}, nil
+}
+
+func absPath(path string) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		return abs
+	}
+	return path
 }
 
 func env(key, fallback string) string {
