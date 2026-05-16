@@ -84,18 +84,30 @@ func (q *Queries) FindRefreshTokenByHash(ctx context.Context, tokenHash string) 
 	return &i, err
 }
 
-const revokeRefreshTokenFamily = `-- name: RevokeRefreshTokenFamily :exec
-UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP
-WHERE id = ? OR parent_id = ?
+const revokeRefreshTokenByID = `-- name: RevokeRefreshTokenByID :exec
+UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE id = ? AND revoked_at IS NULL
 `
 
-type RevokeRefreshTokenFamilyParams struct {
-	ID       string         `json:"id"`
-	ParentID sql.NullString `json:"parent_id"`
+func (q *Queries) RevokeRefreshTokenByID(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, revokeRefreshTokenByID, id)
+	return err
 }
 
-func (q *Queries) RevokeRefreshTokenFamily(ctx context.Context, arg *RevokeRefreshTokenFamilyParams) error {
-	_, err := q.db.ExecContext(ctx, revokeRefreshTokenFamily, arg.ID, arg.ParentID)
+const revokeRefreshTokenFamily = `-- name: RevokeRefreshTokenFamily :exec
+WITH RECURSIVE family(id) AS (
+    SELECT id FROM refresh_tokens WHERE id = ?
+    UNION
+    SELECT rt.id
+    FROM refresh_tokens rt
+    JOIN family f ON rt.parent_id = f.id
+)
+UPDATE refresh_tokens
+SET revoked_at = CURRENT_TIMESTAMP
+WHERE id IN (SELECT id FROM family)
+`
+
+func (q *Queries) RevokeRefreshTokenFamily(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, revokeRefreshTokenFamily, id)
 	return err
 }
 

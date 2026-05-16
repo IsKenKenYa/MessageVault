@@ -7,8 +7,8 @@ VALUES (?, ?, ?, ?);
 
 -- name: GetAuditLogs :many
 SELECT * FROM audit_log
-WHERE user_id = COALESCE(NULLIF(@user_id, ''), user_id)
-  AND action = COALESCE(NULLIF(@action, ''), action)
+WHERE (NULLIF(@user_id, '') IS NULL OR user_id = @user_id)
+  AND (NULLIF(@action, '') IS NULL OR action = @action)
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?;
 
@@ -18,5 +18,5 @@ VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: CountAuditLogs :one
 SELECT COUNT(*) FROM audit_log
-WHERE user_id = COALESCE(NULLIF(@user_id, ''), user_id)
-  AND action = COALESCE(NULLIF(@action, ''), action);
+WHERE (NULLIF(@user_id, '') IS NULL OR user_id = @user_id)
+  AND (NULLIF(@action, '') IS NULL OR action = @action);

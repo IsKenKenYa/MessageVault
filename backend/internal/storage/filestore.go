@@ -18,6 +18,11 @@ import (
 type storeSnapshot struct {
 	Users         map[string]UserRecord         `json:"users"`
 	RefreshTokens map[string]RefreshTokenRecord `json:"refresh_tokens"`
+	Sessions      map[string]SessionRecord      `json:"sessions"`
+	AuditLogs     map[string]AuditRecord        `json:"audit_logs"`
+	Passkeys      map[string]PasskeyCredential  `json:"passkeys"`
+	Challenges    map[string]ChallengeRecord    `json:"challenges"`
+	AuthMethods   map[string]AuthMethodRecord   `json:"auth_methods"`
 	Imports       map[string]storedImport       `json:"imports"`
 	Identities    map[string]storedIdentity     `json:"identities"`
 	Events        map[string]storedEvent        `json:"events"`
@@ -41,8 +46,8 @@ type storedIdentity struct {
 }
 
 type storedEvent struct {
-	UserID   string               `json:"user_id"`
-	ImportID string               `json:"import_id"`
+	UserID   string                `json:"user_id"`
+	ImportID string                `json:"import_id"`
 	Item     msglayer.TimelineItem `json:"item"`
 	Raw      msglayer.Event        `json:"raw"`
 }
@@ -61,11 +66,20 @@ func newFileStore(path, name string) Provider {
 		snapshot: storeSnapshot{
 			Users:         map[string]UserRecord{},
 			RefreshTokens: map[string]RefreshTokenRecord{},
+			Sessions:      map[string]SessionRecord{},
+			AuditLogs:     map[string]AuditRecord{},
+			Passkeys:      map[string]PasskeyCredential{},
+			Challenges:    map[string]ChallengeRecord{},
+			AuthMethods:   map[string]AuthMethodRecord{},
 			Imports:       map[string]storedImport{},
 			Identities:    map[string]storedIdentity{},
 			Events:        map[string]storedEvent{},
 		},
 	}
+}
+
+func NewFileStoreProvider(path string) (Provider, error) {
+	return newFileStore(path, "filestore"), nil
 }
 
 func (s *fileStore) Name() string { return s.name }
@@ -87,7 +101,44 @@ func (s *fileStore) Init(ctx context.Context) error {
 	if len(data) == 0 {
 		return nil
 	}
-	return json.Unmarshal(data, &s.snapshot)
+	if err := json.Unmarshal(data, &s.snapshot); err != nil {
+		return err
+	}
+	s.initMaps()
+	return nil
+}
+
+func (s *fileStore) initMaps() {
+	if s.snapshot.Users == nil {
+		s.snapshot.Users = map[string]UserRecord{}
+	}
+	if s.snapshot.RefreshTokens == nil {
+		s.snapshot.RefreshTokens = map[string]RefreshTokenRecord{}
+	}
+	if s.snapshot.Sessions == nil {
+		s.snapshot.Sessions = map[string]SessionRecord{}
+	}
+	if s.snapshot.AuditLogs == nil {
+		s.snapshot.AuditLogs = map[string]AuditRecord{}
+	}
+	if s.snapshot.Passkeys == nil {
+		s.snapshot.Passkeys = map[string]PasskeyCredential{}
+	}
+	if s.snapshot.Challenges == nil {
+		s.snapshot.Challenges = map[string]ChallengeRecord{}
+	}
+	if s.snapshot.AuthMethods == nil {
+		s.snapshot.AuthMethods = map[string]AuthMethodRecord{}
+	}
+	if s.snapshot.Imports == nil {
+		s.snapshot.Imports = map[string]storedImport{}
+	}
+	if s.snapshot.Identities == nil {
+		s.snapshot.Identities = map[string]storedIdentity{}
+	}
+	if s.snapshot.Events == nil {
+		s.snapshot.Events = map[string]storedEvent{}
+	}
 }
 
 func (s *fileStore) Import(ctx context.Context, userID string, sourcePath string, export msglayer.RootExport, raw []byte) (string, error) {
@@ -432,86 +483,305 @@ func (s *fileStore) UpdateUserPasswordHash(ctx context.Context, userID, newHash,
 	return s.persist()
 }
 
-// ==================== 新增方法 stubs ====================
-
-func (s *fileStore) FindAnyRefreshTokenByHash(_ context.Context, _ string) (RefreshTokenRecord, error) {
-	return RefreshTokenRecord{}, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) FindAnyRefreshTokenByHash(_ context.Context, tokenHash string) (RefreshTokenRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, token := range s.snapshot.RefreshTokens {
+		if token.TokenHash == tokenHash {
+			return token, nil
+		}
+	}
+	return RefreshTokenRecord{}, fmt.Errorf("refresh token not found")
 }
 
-func (s *fileStore) RevokeRefreshTokenFamily(_ context.Context, _ string) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) RevokeRefreshTokenFamily(_ context.Context, tokenID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	queue := []string{tokenID}
+	seen := map[string]struct{}{}
+	now := time.Now().UTC()
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if _, ok := seen[current]; ok {
+			continue
+		}
+		seen[current] = struct{}{}
+		if token, ok := s.snapshot.RefreshTokens[current]; ok && token.RevokedAt.IsZero() {
+			token.RevokedAt = now
+			s.snapshot.RefreshTokens[current] = token
+		}
+		for id, token := range s.snapshot.RefreshTokens {
+			if token.ParentID == current {
+				queue = append(queue, id)
+			}
+		}
+	}
+	return s.persist()
 }
 
-func (s *fileStore) CreateSession(_ context.Context, _ SessionRecord) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) RevokeRefreshTokenByID(_ context.Context, tokenID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	token, ok := s.snapshot.RefreshTokens[tokenID]
+	if !ok {
+		return nil
+	}
+	if token.RevokedAt.IsZero() {
+		token.RevokedAt = time.Now().UTC()
+		s.snapshot.RefreshTokens[tokenID] = token
+	}
+	return s.persist()
 }
 
-func (s *fileStore) ListSessionsByUser(_ context.Context, _ string) ([]SessionRecord, error) {
-	return nil, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) CreateSession(_ context.Context, rec SessionRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.Sessions[rec.ID] = rec
+	return s.persist()
 }
 
-func (s *fileStore) RevokeSession(_ context.Context, _ string) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) GetSession(_ context.Context, sessionID string) (SessionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.snapshot.Sessions[sessionID]
+	if !ok {
+		return SessionRecord{}, fmt.Errorf("session not found")
+	}
+	return session, nil
 }
 
-func (s *fileStore) RevokeOtherSessions(_ context.Context, _, _ string) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) GetSessionByRefreshTokenID(_ context.Context, refreshTokenID string) (SessionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, session := range s.snapshot.Sessions {
+		if session.RefreshTokenID == refreshTokenID {
+			return session, nil
+		}
+	}
+	return SessionRecord{}, fmt.Errorf("session not found")
 }
 
-func (s *fileStore) UpdateSessionLastSeen(_ context.Context, _ string) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) ListSessionsByUser(_ context.Context, userID string) ([]SessionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]SessionRecord, 0, len(s.snapshot.Sessions))
+	for _, session := range s.snapshot.Sessions {
+		if session.UserID != userID {
+			continue
+		}
+		items = append(items, session)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].LastSeenAt.After(items[j].LastSeenAt) })
+	return items, nil
 }
 
-func (s *fileStore) CreateAuditLog(_ context.Context, _ AuditRecord) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) RevokeSession(_ context.Context, sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.snapshot.Sessions[sessionID]
+	if !ok {
+		return nil
+	}
+	session.LastSeenAt = time.Now().UTC()
+	delete(s.snapshot.Sessions, sessionID)
+	if session.RefreshTokenID != "" {
+		if token, ok := s.snapshot.RefreshTokens[session.RefreshTokenID]; ok && token.RevokedAt.IsZero() {
+			token.RevokedAt = time.Now().UTC()
+			s.snapshot.RefreshTokens[session.RefreshTokenID] = token
+		}
+	}
+	return s.persist()
 }
 
-func (s *fileStore) ListAuditLogs(_ context.Context, _, _ string, _, _ int) ([]AuditRecord, error) {
-	return nil, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) RevokeOtherSessions(_ context.Context, userID, currentSessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for id, session := range s.snapshot.Sessions {
+		if session.UserID != userID || id == currentSessionID {
+			continue
+		}
+		if session.RefreshTokenID != "" {
+			if token, ok := s.snapshot.RefreshTokens[session.RefreshTokenID]; ok && token.RevokedAt.IsZero() {
+				token.RevokedAt = now
+				s.snapshot.RefreshTokens[session.RefreshTokenID] = token
+			}
+		}
+		delete(s.snapshot.Sessions, id)
+	}
+	return s.persist()
 }
 
-func (s *fileStore) CountAuditLogs(_ context.Context, _, _ string) (int, error) {
-	return 0, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) UpdateSessionLastSeen(_ context.Context, sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.snapshot.Sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("session not found")
+	}
+	session.LastSeenAt = time.Now().UTC()
+	s.snapshot.Sessions[sessionID] = session
+	return s.persist()
 }
 
-func (s *fileStore) CreatePasskeyCredential(_ context.Context, _ PasskeyCredential) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) UpdateSessionRefreshToken(_ context.Context, sessionID, refreshTokenID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.snapshot.Sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("session not found")
+	}
+	session.RefreshTokenID = refreshTokenID
+	session.LastSeenAt = time.Now().UTC()
+	s.snapshot.Sessions[sessionID] = session
+	return s.persist()
 }
 
-func (s *fileStore) GetPasskeyByCredentialID(_ context.Context, _ string) (PasskeyCredential, error) {
-	return PasskeyCredential{}, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) CreateAuditLog(_ context.Context, rec AuditRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.AuditLogs[rec.ID] = rec
+	return s.persist()
 }
 
-func (s *fileStore) ListPasskeysByUser(_ context.Context, _ string) ([]PasskeyCredential, error) {
-	return nil, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) ListAuditLogs(_ context.Context, userID, action string, limit, offset int) ([]AuditRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]AuditRecord, 0, len(s.snapshot.AuditLogs))
+	for _, rec := range s.snapshot.AuditLogs {
+		if userID != "" && rec.UserID != userID {
+			continue
+		}
+		if action != "" && rec.Action != action {
+			continue
+		}
+		items = append(items, rec)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+	if offset > 0 && offset < len(items) {
+		items = items[offset:]
+	} else if offset >= len(items) {
+		return nil, nil
+	}
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
-func (s *fileStore) UpdatePasskeyLastUsed(_ context.Context, _ string, _ uint32) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) CountAuditLogs(ctx context.Context, userID, action string) (int, error) {
+	items, err := s.ListAuditLogs(ctx, userID, action, 0, 0)
+	if err != nil {
+		return 0, err
+	}
+	return len(items), nil
 }
 
-func (s *fileStore) DeletePasskey(_ context.Context, _, _ string) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) CreatePasskeyCredential(_ context.Context, rec PasskeyCredential) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.Passkeys[rec.ID] = rec
+	return s.persist()
 }
 
-func (s *fileStore) CreateChallenge(_ context.Context, _ ChallengeRecord) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) GetPasskeyByCredentialID(_ context.Context, credentialID string) (PasskeyCredential, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, passkey := range s.snapshot.Passkeys {
+		if passkey.CredentialID == credentialID {
+			return passkey, nil
+		}
+	}
+	return PasskeyCredential{}, fmt.Errorf("passkey not found")
 }
 
-func (s *fileStore) GetChallenge(_ context.Context, _ string) (ChallengeRecord, error) {
-	return ChallengeRecord{}, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) ListPasskeysByUser(_ context.Context, userID string) ([]PasskeyCredential, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]PasskeyCredential, 0, len(s.snapshot.Passkeys))
+	for _, passkey := range s.snapshot.Passkeys {
+		if passkey.UserID != userID {
+			continue
+		}
+		items = append(items, passkey)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+	return items, nil
 }
 
-func (s *fileStore) DeleteChallenge(_ context.Context, _ string) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) UpdatePasskeyLastUsed(_ context.Context, id string, signCount uint32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	passkey, ok := s.snapshot.Passkeys[id]
+	if !ok {
+		return fmt.Errorf("passkey not found")
+	}
+	passkey.SignCount = signCount
+	passkey.LastUsedAt = time.Now().UTC()
+	s.snapshot.Passkeys[id] = passkey
+	return s.persist()
 }
 
-func (s *fileStore) CreateAuthMethod(_ context.Context, _ AuthMethodRecord) error {
-	return fmt.Errorf("not supported in fileStore")
+func (s *fileStore) DeletePasskey(_ context.Context, id, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	passkey, ok := s.snapshot.Passkeys[id]
+	if !ok || passkey.UserID != userID {
+		return nil
+	}
+	delete(s.snapshot.Passkeys, id)
+	return s.persist()
 }
 
-func (s *fileStore) GetAuthMethodByProvider(_ context.Context, _, _ string) (AuthMethodRecord, error) {
-	return AuthMethodRecord{}, fmt.Errorf("not supported in fileStore")
+func (s *fileStore) CreateChallenge(_ context.Context, rec ChallengeRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if rec.CreatedAt.IsZero() {
+		rec.CreatedAt = time.Now().UTC()
+	}
+	s.snapshot.Challenges[rec.ID] = rec
+	return s.persist()
+}
+
+func (s *fileStore) GetChallenge(_ context.Context, id string) (ChallengeRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	challenge, ok := s.snapshot.Challenges[id]
+	if !ok || time.Now().UTC().After(challenge.ExpiresAt) {
+		return ChallengeRecord{}, fmt.Errorf("challenge not found")
+	}
+	return challenge, nil
+}
+
+func (s *fileStore) DeleteChallenge(_ context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.snapshot.Challenges, id)
+	return s.persist()
+}
+
+func (s *fileStore) CreateAuthMethod(_ context.Context, rec AuthMethodRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.snapshot.AuthMethods {
+		if existing.ProviderType == rec.ProviderType && existing.ProviderUserID == rec.ProviderUserID {
+			return fmt.Errorf("auth method already exists")
+		}
+	}
+	s.snapshot.AuthMethods[rec.ID] = rec
+	return s.persist()
+}
+
+func (s *fileStore) GetAuthMethodByProvider(_ context.Context, providerType, providerUserID string) (AuthMethodRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, rec := range s.snapshot.AuthMethods {
+		if rec.ProviderType == providerType && rec.ProviderUserID == providerUserID {
+			return rec, nil
+		}
+	}
+	return AuthMethodRecord{}, fmt.Errorf("auth method not found")
 }
 
 func EnsureParentDir(path string) error {

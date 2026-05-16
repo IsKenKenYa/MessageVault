@@ -40,6 +40,8 @@ class AppEnvironmentManager(context: Context) {
                 accessToken = preferences[KEY_ACCESS_TOKEN],
                 refreshToken = preferences[KEY_REFRESH_TOKEN],
                 accessTokenExpiresAtEpochSeconds = preferences[KEY_ACCESS_TOKEN_EXPIRES_AT]?.toLongOrNull(),
+                sessionId = preferences[KEY_SESSION_ID],
+                deviceName = preferences[KEY_DEVICE_NAME],
                 userId = preferences[KEY_USER_ID],
                 userName = preferences[KEY_USER_NAME],
                 email = preferences[KEY_EMAIL]
@@ -80,6 +82,8 @@ class AppEnvironmentManager(context: Context) {
             setOrRemove(preferences, KEY_ACCESS_TOKEN, session.accessToken)
             setOrRemove(preferences, KEY_REFRESH_TOKEN, session.refreshToken)
             setOrRemove(preferences, KEY_ACCESS_TOKEN_EXPIRES_AT, session.accessTokenExpiresAtEpochSeconds?.toString())
+            setOrRemove(preferences, KEY_SESSION_ID, session.sessionId)
+            setOrRemove(preferences, KEY_DEVICE_NAME, session.deviceName)
             setOrRemove(preferences, KEY_USER_ID, session.userId)
             setOrRemove(preferences, KEY_USER_NAME, session.userName)
             setOrRemove(preferences, KEY_EMAIL, session.email)
@@ -134,6 +138,8 @@ class AppEnvironmentManager(context: Context) {
         val KEY_ACCESS_TOKEN = stringPreferencesKey("access_token")
         val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         val KEY_ACCESS_TOKEN_EXPIRES_AT = stringPreferencesKey("access_token_expires_at")
+        val KEY_SESSION_ID = stringPreferencesKey("session_id")
+        val KEY_DEVICE_NAME = stringPreferencesKey("device_name")
         val KEY_USER_ID = stringPreferencesKey("user_id")
         val KEY_USER_NAME = stringPreferencesKey("user_name")
         val KEY_EMAIL = stringPreferencesKey("email")

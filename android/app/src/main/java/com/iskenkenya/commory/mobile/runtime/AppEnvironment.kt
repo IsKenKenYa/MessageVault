@@ -15,6 +15,8 @@ data class AuthSession(
     val accessToken: String? = null,
     val refreshToken: String? = null,
     val accessTokenExpiresAtEpochSeconds: Long? = null,
+    val sessionId: String? = null,
+    val deviceName: String? = null,
     val userId: String? = null,
     val userName: String? = null,
     val email: String? = null

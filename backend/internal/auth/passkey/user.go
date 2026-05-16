@@ -14,11 +14,11 @@ func NewWebAuthnUser(user storage.UserRecord, creds []storage.PasskeyCredential)
 	waCreds := make([]webauthn.Credential, 0, len(creds))
 	for _, c := range creds {
 		waCred := webauthn.Credential{
-			ID:              []byte(c.CredentialID),
-			PublicKey:        []byte(c.PublicKey),
+			ID:              decodeStoredBytes(c.CredentialID),
+			PublicKey:       decodeStoredBytes(c.PublicKey),
 			AttestationType: c.AttestationType,
 			Authenticator: webauthn.Authenticator{
-				AAGUID:       []byte(c.AAGUID),
+				AAGUID:       decodeStoredBytes(c.AAGUID),
 				SignCount:    c.SignCount,
 				CloneWarning: false,
 			},

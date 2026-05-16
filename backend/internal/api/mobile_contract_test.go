@@ -136,6 +136,13 @@ func TestMobileRefreshRotatesRefreshToken(t *testing.T) {
 	if res.Code != http.StatusUnauthorized {
 		t.Fatalf("expected old refresh token to be rejected, got %d", res.Code)
 	}
+	var envelope struct {
+		Msg string `json:"msg"`
+	}
+	decodeJSON(t, res.Body.Bytes(), &envelope)
+	if envelope.Msg != "ERR_REFRESH_TOKEN_REPLAYED" {
+		t.Fatalf("expected replay error message, got %q", envelope.Msg)
+	}
 }
 
 func TestMobileLogoutRevokesRefreshToken(t *testing.T) {
@@ -189,6 +196,80 @@ func TestMobileSetupInitializeRejectsRepeat(t *testing.T) {
 	}
 }
 
+func TestMobilePasskeyEnrollmentRoutesRequireAuth(t *testing.T) {
+	handler := newTestMobileHandler(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/passkey/register/begin", nil)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthenticated passkey begin to fail with 401, got %d", res.Code)
+	}
+
+	session := registerMobileSession(t, handler, "passkey-user", "passkey@example.com")
+	authReq := httptest.NewRequest(http.MethodPost, "/api/auth/passkey/register/begin", nil)
+	authReq.Header.Set("Authorization", "Bearer "+session.Token)
+	authRes := httptest.NewRecorder()
+	handler.ServeHTTP(authRes, authReq)
+	if authRes.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected authenticated request to reach passkey handler, got %d", authRes.Code)
+	}
+}
+
+func TestMobileSessionsDeleteOthersKeepsCurrentSession(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	current := registerMobileSession(t, handler, "session-user", "session@example.com")
+	other := loginMobileSession(t, handler, "session-user")
+
+	sessions := listMobileSessions(t, handler, current.Token)
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(sessions))
+	}
+	currentCount := 0
+	for _, session := range sessions {
+		if session.Current {
+			currentCount++
+		}
+	}
+	if currentCount != 1 {
+		t.Fatalf("expected exactly one current session marker, got %d", currentCount)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sessions", nil)
+	req.Header.Set("Authorization", "Bearer "+current.Token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("delete others status = %d, body = %s", res.Code, res.Body.String())
+	}
+
+	if _, _, code := tryRefreshMobileSession(t, handler, other.RefreshToken); code != http.StatusUnauthorized {
+		t.Fatalf("expected revoked secondary session refresh to fail, got %d", code)
+	}
+	if _, refreshed, code := tryRefreshMobileSession(t, handler, current.RefreshToken); code != http.StatusOK || refreshed.RefreshToken == "" {
+		t.Fatalf("expected current session refresh to survive, got status=%d refresh=%q", code, refreshed.RefreshToken)
+	}
+}
+
+func TestMobileSessionDeleteRequiresOwnership(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	owner := registerMobileSession(t, handler, "owner-user", "owner-user@example.com")
+	other := registerMobileSession(t, handler, "other-user", "other-user@example.com")
+
+	otherSessions := listMobileSessions(t, handler, other.Token)
+	if len(otherSessions) != 1 {
+		t.Fatalf("expected 1 other session, got %d", len(otherSessions))
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sessions/"+otherSessions[0].ID, nil)
+	req.Header.Set("Authorization", "Bearer "+owner.Token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected cross-user revoke to be hidden, got %d", res.Code)
+	}
+}
+
 func newTestMobileHandler(t *testing.T) http.Handler {
 	t.Helper()
 	store, err := storage.NewSQLiteProvider(filepath.Join(t.TempDir(), "commory.json"))
@@ -215,6 +296,11 @@ func registerMobileUser(t *testing.T, handler http.Handler, userName, email stri
 type mobileAuthSession struct {
 	Token        string
 	RefreshToken string
+}
+
+type mobileSessionRecord struct {
+	ID      string `json:"id"`
+	Current bool   `json:"current"`
 }
 
 func registerMobileSession(t *testing.T, handler http.Handler, userName, email string) mobileAuthSession {
@@ -250,14 +336,46 @@ func registerMobileSession(t *testing.T, handler http.Handler, userName, email s
 
 func refreshMobileSession(t *testing.T, handler http.Handler, refreshToken string) mobileAuthSession {
 	t.Helper()
+	res, session, code := tryRefreshMobileSession(t, handler, refreshToken)
+	if code != http.StatusOK {
+		t.Fatalf("refresh status = %d, body = %s", code, res)
+	}
+	return session
+}
+
+func tryRefreshMobileSession(t *testing.T, handler http.Handler, refreshToken string) (string, mobileAuthSession, int) {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
 		"refreshToken": refreshToken,
 	})))
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
+	var envelope struct {
+		Data struct {
+			Token        string `json:"token"`
+			RefreshToken string `json:"refreshToken"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(res.Body.Bytes(), &envelope)
+	return res.Body.String(), mobileAuthSession{
+		Token:        envelope.Data.Token,
+		RefreshToken: envelope.Data.RefreshToken,
+	}, res.Code
+}
+
+func loginMobileSession(t *testing.T, handler http.Handler, userName string) mobileAuthSession {
+	t.Helper()
+	payload := mustJSON(t, map[string]string{
+		"userName": userName,
+		"password": "passw0rd!",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
-		t.Fatalf("refresh status = %d, body = %s", res.Code, res.Body.String())
+		t.Fatalf("login status = %d, body = %s", res.Code, res.Body.String())
 	}
 	var envelope struct {
 		Data struct {
@@ -267,9 +385,25 @@ func refreshMobileSession(t *testing.T, handler http.Handler, refreshToken strin
 	}
 	decodeJSON(t, res.Body.Bytes(), &envelope)
 	if envelope.Data.Token == "" || envelope.Data.RefreshToken == "" {
-		t.Fatal("expected refreshed token pair")
+		t.Fatal("expected login token pair")
 	}
 	return mobileAuthSession{Token: envelope.Data.Token, RefreshToken: envelope.Data.RefreshToken}
+}
+
+func listMobileSessions(t *testing.T, handler http.Handler, token string) []mobileSessionRecord {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("list sessions status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var envelope struct {
+		Data []mobileSessionRecord `json:"data"`
+	}
+	decodeJSON(t, res.Body.Bytes(), &envelope)
+	return envelope.Data
 }
 
 func mustJSON(t *testing.T, value any) []byte {

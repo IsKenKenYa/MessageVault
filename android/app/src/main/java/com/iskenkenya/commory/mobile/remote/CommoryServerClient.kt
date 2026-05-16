@@ -2,6 +2,7 @@ package com.iskenkenya.commory.mobile.remote
 
 import android.content.Context
 import android.util.Base64
+import android.os.Build
 import com.iskenkenya.commory.mobile.runtime.AppEnvironmentManager
 import com.iskenkenya.commory.mobile.runtime.AuthSession
 import kotlinx.coroutines.Dispatchers
@@ -25,13 +26,11 @@ class CommoryServerClient(
 ) {
     private val serviceCache = ConcurrentHashMap<String, CommoryApiService>()
     private val refreshServiceCache = ConcurrentHashMap<String, CommoryApiService>()
+    private val deviceName = buildDeviceName()
 
     private val refreshClient = baseClientBuilder().build()
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+    private val client = baseClientBuilder()
         .authenticator { _, response ->
             if (responseCount(response) > 1 || response.request().url().encodedPath().contains("/api/auth/")) {
                 return@authenticator null
@@ -48,6 +47,12 @@ class CommoryServerClient(
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("X-Commory-Device", deviceName)
+                .build()
+            chain.proceed(request)
+        }
 
     private fun service(baseUrl: String): CommoryApiService {
         val normalized = normalizeBaseUrl(baseUrl)
@@ -94,7 +99,9 @@ class CommoryServerClient(
         currentSession.copy(
             accessToken = accessToken,
             refreshToken = pair.refreshToken,
-            accessTokenExpiresAtEpochSeconds = accessTokenExpiresAt(accessToken)
+            accessTokenExpiresAtEpochSeconds = accessTokenExpiresAt(accessToken),
+            sessionId = accessTokenSessionId(accessToken) ?: currentSession.sessionId,
+            deviceName = currentSession.deviceName ?: deviceName
         )
     }
 
@@ -146,14 +153,20 @@ class CommoryServerClient(
     suspend fun refreshPersistedSession(): Result<AuthSession> = wrapCall {
         val environment = environmentManager.currentSnapshot()
         val refreshToken = environment.authSession.refreshToken ?: error("missing refresh token")
-        val updated = refresh(environment.serverUrl, refreshToken, environment.authSession).getOrThrow()
+        val updated = refresh(environment.serverUrl, refreshToken, environment.authSession).getOrElse { throwable ->
+            if (throwable.isTerminalAuthFailure()) {
+                environmentManager.clearSession()
+            }
+            throw throwable
+        }
         val userResponse = refreshService(environment.serverUrl).getUserInfo(bearer(updated.accessToken ?: ""))
         require(userResponse.isSuccessful) { userResponse.body()?.msg ?: userResponse.errorBody()?.string() ?: "user info failed" }
         val user = userResponse.body()?.data ?: error(userResponse.body()?.msg ?: "missing user payload")
         val session = updated.copy(
             userId = user.id,
             userName = user.userName ?: user.user_name,
-            email = user.email
+            email = user.email,
+            deviceName = updated.deviceName ?: deviceName
         )
         environmentManager.updateSession(session)
         session
@@ -189,6 +202,8 @@ class CommoryServerClient(
             accessToken = token,
             refreshToken = refreshToken,
             accessTokenExpiresAtEpochSeconds = accessTokenExpiresAt(token),
+            sessionId = accessTokenSessionId(token),
+            deviceName = deviceName,
             userId = user.id,
             userName = user.userName ?: user.user_name,
             email = user.email
@@ -204,6 +219,15 @@ class CommoryServerClient(
         }.getOrNull()
     }
 
+    private fun accessTokenSessionId(token: String?): String? {
+        if (token.isNullOrBlank()) return null
+        return runCatching {
+            val payload = token.split(".").getOrNull(1) ?: return null
+            val decoded = Base64.decode(payload, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+            JSONObject(String(decoded)).optString("sid").takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
+
     private fun responseCount(response: Response): Int {
         var count = 1
         var prior = response.priorResponse()
@@ -212,5 +236,20 @@ class CommoryServerClient(
             prior = prior.priorResponse()
         }
         return count
+    }
+
+    private fun buildDeviceName(): String {
+        val manufacturer = Build.MANUFACTURER?.trim().orEmpty()
+        val model = Build.MODEL?.trim().orEmpty()
+        return listOf(manufacturer, model)
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" ")
+            .ifBlank { "Android Device" }
+    }
+
+    private fun Throwable.isTerminalAuthFailure(): Boolean {
+        val network = this as? NetworkException ?: return false
+        return network.error is NetworkError.Unauthorized
     }
 }

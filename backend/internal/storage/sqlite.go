@@ -465,22 +465,15 @@ func (s *sqliteProvider) FindAnyRefreshTokenByHash(ctx context.Context, tokenHas
 	if err != nil {
 		return RefreshTokenRecord{}, err
 	}
-	return RefreshTokenRecord{
-		ID:        row.ID,
-		UserID:    row.UserID,
-		TokenHash: row.TokenHash,
-		ParentID:  row.ParentID.String,
-		ExpiresAt: row.ExpiresAt,
-		CreatedAt: row.CreatedAt,
-		RevokedAt: row.RevokedAt.Time,
-	}, nil
+	return s.rowToRefreshToken(row), nil
 }
 
 func (s *sqliteProvider) RevokeRefreshTokenFamily(ctx context.Context, tokenID string) error {
-	return s.q.RevokeRefreshTokenFamily(ctx, &sqlc.RevokeRefreshTokenFamilyParams{
-		ID:       tokenID,
-		ParentID: sql.NullString{String: tokenID, Valid: true},
-	})
+	return s.q.RevokeRefreshTokenFamily(ctx, tokenID)
+}
+
+func (s *sqliteProvider) RevokeRefreshTokenByID(ctx context.Context, tokenID string) error {
+	return s.q.RevokeRefreshTokenByID(ctx, tokenID)
 }
 
 // ==================== Sessions ====================
@@ -497,6 +490,22 @@ func (s *sqliteProvider) CreateSession(ctx context.Context, rec SessionRecord) e
 	})
 }
 
+func (s *sqliteProvider) GetSession(ctx context.Context, sessionID string) (SessionRecord, error) {
+	row, err := s.q.GetSession(ctx, sessionID)
+	if err != nil {
+		return SessionRecord{}, err
+	}
+	return s.rowToSession(row), nil
+}
+
+func (s *sqliteProvider) GetSessionByRefreshTokenID(ctx context.Context, refreshTokenID string) (SessionRecord, error) {
+	row, err := s.q.GetSessionByRefreshTokenID(ctx, sql.NullString{String: refreshTokenID, Valid: refreshTokenID != ""})
+	if err != nil {
+		return SessionRecord{}, err
+	}
+	return s.rowToSession(row), nil
+}
+
 func (s *sqliteProvider) ListSessionsByUser(ctx context.Context, userID string) ([]SessionRecord, error) {
 	rows, err := s.q.ListSessionsByUser(ctx, userID)
 	if err != nil {
@@ -504,17 +513,7 @@ func (s *sqliteProvider) ListSessionsByUser(ctx context.Context, userID string) 
 	}
 	items := make([]SessionRecord, 0, len(rows))
 	for _, r := range rows {
-		items = append(items, SessionRecord{
-			ID:             r.ID,
-			UserID:         r.UserID,
-			RefreshTokenID: r.RefreshTokenID.String,
-			DeviceName:     r.DeviceName.String,
-			DeviceType:     r.DeviceType.String,
-			IPAddress:      r.IpAddress.String,
-			UserAgent:      r.UserAgent.String,
-			CreatedAt:      r.CreatedAt,
-			LastSeenAt:     r.LastSeenAt,
-		})
+		items = append(items, s.rowToSession(r))
 	}
 	return items, nil
 }
@@ -532,6 +531,13 @@ func (s *sqliteProvider) RevokeOtherSessions(ctx context.Context, userID, curren
 
 func (s *sqliteProvider) UpdateSessionLastSeen(ctx context.Context, sessionID string) error {
 	return s.q.UpdateSessionLastSeen(ctx, sessionID)
+}
+
+func (s *sqliteProvider) UpdateSessionRefreshToken(ctx context.Context, sessionID, refreshTokenID string) error {
+	return s.q.UpdateSessionRefreshToken(ctx, &sqlc.UpdateSessionRefreshTokenParams{
+		RefreshTokenID: sql.NullString{String: refreshTokenID, Valid: refreshTokenID != ""},
+		ID:             sessionID,
+	})
 }
 
 // ==================== Audit Log ====================
@@ -601,19 +607,7 @@ func (s *sqliteProvider) GetPasskeyByCredentialID(ctx context.Context, credentia
 	if err != nil {
 		return PasskeyCredential{}, err
 	}
-	return PasskeyCredential{
-		ID:              row.ID,
-		UserID:          row.UserID,
-		CredentialID:    row.CredentialID,
-		PublicKey:       row.PublicKey,
-		AttestationType: row.AttestationType,
-		AAGUID:          row.Aaguid,
-		SignCount:       uint32(row.SignCount),
-		Transports:      row.Transports,
-		Name:            row.Name,
-		LastUsedAt:      row.LastUsedAt.Time,
-		CreatedAt:       row.CreatedAt,
-	}, nil
+	return s.rowToPasskey(row), nil
 }
 
 func (s *sqliteProvider) ListPasskeysByUser(ctx context.Context, userID string) ([]PasskeyCredential, error) {
@@ -623,19 +617,7 @@ func (s *sqliteProvider) ListPasskeysByUser(ctx context.Context, userID string) 
 	}
 	items := make([]PasskeyCredential, 0, len(rows))
 	for _, r := range rows {
-		items = append(items, PasskeyCredential{
-			ID:              r.ID,
-			UserID:          r.UserID,
-			CredentialID:    r.CredentialID,
-			PublicKey:       r.PublicKey,
-			AttestationType: r.AttestationType,
-			AAGUID:          r.Aaguid,
-			SignCount:       uint32(r.SignCount),
-			Transports:      r.Transports,
-			Name:            r.Name,
-			LastUsedAt:      r.LastUsedAt.Time,
-			CreatedAt:       r.CreatedAt,
-		})
+		items = append(items, s.rowToPasskey(r))
 	}
 	return items, nil
 }
@@ -729,6 +711,48 @@ func (s *sqliteProvider) rowToUser(row *sqlc.User) UserRecord {
 		Buttons:      buttons,
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
+	}
+}
+
+func (s *sqliteProvider) rowToRefreshToken(row *sqlc.RefreshToken) RefreshTokenRecord {
+	return RefreshTokenRecord{
+		ID:        row.ID,
+		UserID:    row.UserID,
+		TokenHash: row.TokenHash,
+		ParentID:  row.ParentID.String,
+		ExpiresAt: row.ExpiresAt,
+		CreatedAt: row.CreatedAt,
+		RevokedAt: row.RevokedAt.Time,
+	}
+}
+
+func (s *sqliteProvider) rowToSession(row *sqlc.Session) SessionRecord {
+	return SessionRecord{
+		ID:             row.ID,
+		UserID:         row.UserID,
+		RefreshTokenID: row.RefreshTokenID.String,
+		DeviceName:     row.DeviceName.String,
+		DeviceType:     row.DeviceType.String,
+		IPAddress:      row.IpAddress.String,
+		UserAgent:      row.UserAgent.String,
+		CreatedAt:      row.CreatedAt,
+		LastSeenAt:     row.LastSeenAt,
+	}
+}
+
+func (s *sqliteProvider) rowToPasskey(row *sqlc.PasskeyCredential) PasskeyCredential {
+	return PasskeyCredential{
+		ID:              row.ID,
+		UserID:          row.UserID,
+		CredentialID:    row.CredentialID,
+		PublicKey:       row.PublicKey,
+		AttestationType: row.AttestationType,
+		AAGUID:          row.Aaguid,
+		SignCount:       uint32(row.SignCount),
+		Transports:      row.Transports,
+		Name:            row.Name,
+		LastUsedAt:      row.LastUsedAt.Time,
+		CreatedAt:       row.CreatedAt,
 	}
 }
 

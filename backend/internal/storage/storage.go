@@ -75,17 +75,17 @@ type AuditRecord struct {
 }
 
 type PasskeyCredential struct {
-	ID               string    `json:"id"`
-	UserID           string    `json:"user_id"`
-	CredentialID     string    `json:"credential_id"`
-	PublicKey        string    `json:"public_key"`
-	AttestationType  string    `json:"attestation_type"`
-	AAGUID           string    `json:"aaguid"`
-	SignCount        uint32    `json:"sign_count"`
-	Transports       string    `json:"transports"`
-	Name             string    `json:"name"`
-	LastUsedAt       time.Time `json:"last_used_at"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	UserID          string    `json:"user_id"`
+	CredentialID    string    `json:"credential_id"`
+	PublicKey       string    `json:"public_key"`
+	AttestationType string    `json:"attestation_type"`
+	AAGUID          string    `json:"aaguid"`
+	SignCount       uint32    `json:"sign_count"`
+	Transports      string    `json:"transports"`
+	Name            string    `json:"name"`
+	LastUsedAt      time.Time `json:"last_used_at"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type ChallengeRecord struct {
@@ -135,13 +135,17 @@ type Provider interface {
 	FindAnyRefreshTokenByHash(context.Context, string) (RefreshTokenRecord, error)
 	// 令牌族撤销：按 parent_id 链撤销整族
 	RevokeRefreshTokenFamily(context.Context, string) error
+	RevokeRefreshTokenByID(context.Context, string) error
 
 	// 会话管理
 	CreateSession(context.Context, SessionRecord) error
+	GetSession(context.Context, string) (SessionRecord, error)
+	GetSessionByRefreshTokenID(context.Context, string) (SessionRecord, error)
 	ListSessionsByUser(context.Context, string) ([]SessionRecord, error)
 	RevokeSession(context.Context, string) error
 	RevokeOtherSessions(context.Context, string, string) error // userID, currentSessionID
 	UpdateSessionLastSeen(context.Context, string) error
+	UpdateSessionRefreshToken(context.Context, string, string) error // sessionID, refreshTokenID
 
 	// 审计日志
 	CreateAuditLog(context.Context, AuditRecord) error

@@ -36,6 +36,9 @@
 - 分支策略：`main` 稳定且 CI 全绿，功能使用 `feat/*`，修复使用 `fix/*`，禁止直接推送 `main`。
 - 跨 Android、Backend、Web、MsgLayer、Agent、Docker 的变更必须同步评估，并在 PR 中说明。
 - 技术债记录在 `docs/technical-debt.md`，不要在无关 PR 中顺手改。
+- 默认不使用 subagent 或平行代理。只有用户明确要求委派、分工或 parallel agent work 时才可使用。
+- 面向用户的交付物禁止包含原始 scratchpad、逐段回放式研究过程或重复的中间分析；保留决策、变更、验证和风险即可。
+- 跨边界工作默认按纵向切片推进：先修契约和编译断点，再补客户端对齐，再扩展 UI/治理，避免单个不可审阅的大 diff。
 
 ## 中文优先与国际化
 
@@ -92,6 +95,8 @@ CI 或 review 中使用 `bash scripts/sync-agent-skills.sh --check` 确认 `.cla
 - 治理：本文件、`AGENTS.md`、CI workflow、scripts、skills。
 
 除非能消除真实重复或澄清跨模块契约，否则不要新增共享抽象。大文件或大 diff 需要拆分，或在 PR 中给出简短理由。
+- 当任务同时跨 Android、Backend、Web 时，优先拆成能独立验证的纵向切片：规则/文档、backend foundation、client parity、UI/运营面。
+- 如果某一切片尚未验证通过，不要继续向下堆叠新的跨边界能力。
 
 ## 日志与隐私
 

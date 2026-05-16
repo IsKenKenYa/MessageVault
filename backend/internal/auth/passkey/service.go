@@ -3,14 +3,13 @@ package passkey
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
-	"github.com/go-webauthn/webauthn"
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 type Service struct {
@@ -26,9 +25,9 @@ func NewService(store storage.Provider, rpName, rpID, origin string) (*Service, 
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			ResidentKey: protocol.ResidentKeyRequirementRequired,
 		},
-		Timeouts: webauthn.Timeouts{
-			Login:        webauthn.TimeoutConfig{Timeout: 120000},
-			Registration: webauthn.TimeoutConfig{Timeout: 120000},
+		Timeouts: webauthn.TimeoutsConfig{
+			Login:        webauthn.TimeoutConfig{Timeout: 120 * time.Second},
+			Registration: webauthn.TimeoutConfig{Timeout: 120 * time.Second},
 		},
 	})
 	if err != nil {
@@ -52,7 +51,7 @@ func (s *Service) BeginRegistration(ctx context.Context, userID string) (*protoc
 		for _, c := range existingCreds {
 			excludeCreds = append(excludeCreds, protocol.CredentialDescriptor{
 				Type:         protocol.PublicKeyCredentialType,
-				CredentialID: []byte(c.CredentialID),
+				CredentialID: decodeStoredBytes(c.CredentialID),
 			})
 		}
 		opts = append(opts, webauthn.WithExclusions(excludeCreds))
@@ -67,7 +66,7 @@ func (s *Service) BeginRegistration(ctx context.Context, userID string) (*protoc
 	challengeID := randomID("chal")
 	if err := s.store.CreateChallenge(ctx, storage.ChallengeRecord{
 		ID:        challengeID,
-		Challenge: base64.StdEncoding.EncodeToString(sessionJSON),
+		Challenge: encodeStoredBytes(sessionJSON),
 		UserID:    userID,
 		FlowType:  "passkey_register",
 		ExpiresAt: time.Now().UTC().Add(5 * time.Minute),
@@ -86,7 +85,7 @@ func (s *Service) FinishRegistration(ctx context.Context, userID, challengeID st
 	_ = s.store.DeleteChallenge(ctx, challengeID)
 
 	var sessionData webauthn.SessionData
-	sessionJSON, _ := base64.StdEncoding.DecodeString(chal.Challenge)
+	sessionJSON := decodeStoredBytes(chal.Challenge)
 	if err := json.Unmarshal(sessionJSON, &sessionData); err != nil {
 		return fmt.Errorf("invalid challenge data")
 	}
@@ -103,23 +102,36 @@ func (s *Service) FinishRegistration(ctx context.Context, userID, challengeID st
 		return fmt.Errorf("verify registration: %w", err)
 	}
 
-	transportsJSON, _ := json.Marshal(response.Response.Transport)
-	return s.store.CreatePasskeyCredential(ctx, storage.PasskeyCredential{
+	transportsJSON, _ := json.Marshal(response.Response.Transports)
+	credentialRecord := storage.PasskeyCredential{
 		ID:              randomID("pk"),
 		UserID:          userID,
-		CredentialID:    base64.StdEncoding.EncodeToString(credential.ID),
-		PublicKey:        base64.StdEncoding.EncodeToString(credential.PublicKey),
+		CredentialID:    encodeStoredBytes(credential.ID),
+		PublicKey:       encodeStoredBytes(credential.PublicKey),
 		AttestationType: credential.AttestationType,
-		AAGUID:          base64.StdEncoding.EncodeToString(credential.Authenticator.AAGUID),
+		AAGUID:          encodeStoredBytes(credential.Authenticator.AAGUID),
 		SignCount:       credential.Authenticator.SignCount,
 		Transports:      string(transportsJSON),
 		Name:            fmt.Sprintf("Passkey %s", time.Now().Format("2006-01-02")),
+		CreatedAt:       time.Now().UTC(),
+	}
+	if err := s.store.CreatePasskeyCredential(ctx, credentialRecord); err != nil {
+		return err
+	}
+	return s.store.CreateAuthMethod(ctx, storage.AuthMethodRecord{
+		ID:             randomID("auth"),
+		UserID:         userID,
+		ProviderType:   "passkey",
+		ProviderUserID: credentialRecord.CredentialID,
+		Metadata:       fmt.Sprintf(`{"passkeyId":%q,"name":%q}`, credentialRecord.ID, credentialRecord.Name),
+		CreatedAt:      time.Now().UTC(),
+		UpdatedAt:      time.Now().UTC(),
 	})
 }
 
 func (s *Service) BeginLogin(ctx context.Context) (*protocol.CredentialAssertion, string, error) {
 	// Discoverable login - 不需要预先知道用户
-	_, sessionData, err := s.wa.BeginDiscoverableLogin()
+	assertion, sessionData, err := s.wa.BeginDiscoverableLogin()
 	if err != nil {
 		return nil, "", err
 	}
@@ -128,23 +140,14 @@ func (s *Service) BeginLogin(ctx context.Context) (*protocol.CredentialAssertion
 	challengeID := randomID("chal")
 	if err := s.store.CreateChallenge(ctx, storage.ChallengeRecord{
 		ID:        challengeID,
-		Challenge: base64.StdEncoding.EncodeToString(sessionJSON),
+		Challenge: encodeStoredBytes(sessionJSON),
 		FlowType:  "passkey_login",
 		ExpiresAt: time.Now().UTC().Add(5 * time.Minute),
 	}); err != nil {
 		return nil, "", err
 	}
 
-	assertion, _ := s.wa.BeginDiscoverableLogin()
-	_ = assertion // 已通过上面获取
-	return &protocol.CredentialAssertion{
-		Response: protocol.PublicKeyCredentialRequestOptions{
-			Challenge:        sessionData.Challenge,
-			Timeout:          120000,
-			RelyingPartyID:   s.wa.Config.RPID,
-			UserVerification: protocol.VerificationPreferred,
-		},
-	}, challengeID, nil
+	return assertion, challengeID, nil
 }
 
 func (s *Service) FinishLogin(ctx context.Context, challengeID string, response *protocol.ParsedCredentialAssertionData) (string, error) {
@@ -155,13 +158,13 @@ func (s *Service) FinishLogin(ctx context.Context, challengeID string, response 
 	_ = s.store.DeleteChallenge(ctx, challengeID)
 
 	var sessionData webauthn.SessionData
-	sessionJSON, _ := base64.StdEncoding.DecodeString(chal.Challenge)
+	sessionJSON := decodeStoredBytes(chal.Challenge)
 	if err := json.Unmarshal(sessionJSON, &sessionData); err != nil {
 		return "", fmt.Errorf("invalid challenge data")
 	}
 
 	handler := func(rawID, userHandle []byte) (webauthn.User, error) {
-		credID := base64.StdEncoding.EncodeToString(rawID)
+		credID := encodeStoredBytes(rawID)
 		cred, err := s.store.GetPasskeyByCredentialID(ctx, credID)
 		if err != nil {
 			return nil, fmt.Errorf("credential not found")
@@ -174,12 +177,12 @@ func (s *Service) FinishLogin(ctx context.Context, challengeID string, response 
 		return NewWebAuthnUser(user, creds), nil
 	}
 
-	credential, err := s.wa.FinishDiscoverableLogin(handler, sessionData, response)
+	credential, err := s.wa.ValidateDiscoverableLogin(handler, sessionData, response)
 	if err != nil {
 		return "", fmt.Errorf("verify login: %w", err)
 	}
 
-	credID := base64.StdEncoding.EncodeToString(credential.ID)
+	credID := encodeStoredBytes(credential.ID)
 	cred, _ := s.store.GetPasskeyByCredentialID(ctx, credID)
 	_ = s.store.UpdatePasskeyLastUsed(ctx, cred.ID, credential.Authenticator.SignCount)
 

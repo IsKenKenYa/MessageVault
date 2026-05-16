@@ -13,8 +13,8 @@ import (
 
 const countAuditLogs = `-- name: CountAuditLogs :one
 SELECT COUNT(*) FROM audit_log
-WHERE user_id = COALESCE(NULLIF(?1, ''), user_id)
-  AND action = COALESCE(NULLIF(?2, ''), action)
+WHERE (NULLIF(?1, '') IS NULL OR user_id = ?1)
+  AND (NULLIF(?2, '') IS NULL OR action = ?2)
 `
 
 type CountAuditLogsParams struct {
@@ -57,10 +57,10 @@ func (q *Queries) CreateAuditLog(ctx context.Context, arg *CreateAuditLogParams)
 
 const getAuditLogs = `-- name: GetAuditLogs :many
 SELECT id, user_id, "action", ip_address, user_agent, detail, created_at FROM audit_log
-WHERE user_id = COALESCE(NULLIF(?, ''), user_id)
-  AND action = COALESCE(NULLIF(?, ''), action)
+WHERE (NULLIF(?1, '') IS NULL OR user_id = ?1)
+  AND (NULLIF(?2, '') IS NULL OR action = ?2)
 ORDER BY created_at DESC
-LIMIT ? OFFSET ?
+LIMIT ?3 OFFSET ?4
 `
 
 type GetAuditLogsParams struct {

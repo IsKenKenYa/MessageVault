@@ -1,6 +1,8 @@
 package com.iskenkenya.commory.mobile.auth
 
 import com.iskenkenya.commory.mobile.remote.CommoryServerClient
+import com.iskenkenya.commory.mobile.remote.NetworkError
+import com.iskenkenya.commory.mobile.remote.NetworkException
 import com.iskenkenya.commory.mobile.runtime.AppEnvironmentManager
 import com.iskenkenya.commory.mobile.runtime.AuthSession
 import com.iskenkenya.commory.sdk.auth.AuthCredentials
@@ -46,7 +48,13 @@ class CommoryServerAuthProvider(
 
     override suspend fun refreshToken(): AuthResult {
         val refreshed = serverClient.refreshPersistedSession()
-            .getOrElse { return AuthResult.Error("REFRESH_FAILED", it.message ?: "refresh failed") }
+            .getOrElse {
+                if (it is NetworkException && it.error is NetworkError.Unauthorized) {
+                    _isAuthenticated.value = false
+                    _currentUser.value = null
+                }
+                return AuthResult.Error("REFRESH_FAILED", it.message ?: "refresh failed")
+            }
         _isAuthenticated.value = true
         _currentUser.value = refreshed.toUserInfo()
         return AuthResult.Success(refreshed.accessToken.orEmpty(), refreshed.toUserInfo()!!)

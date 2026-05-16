@@ -9,9 +9,17 @@ import (
 type contextKey string
 
 const userIDContextKey contextKey = "commory.user_id"
+const sessionIDContextKey contextKey = "commory.session_id"
 
 func UserIDFromContext(ctx context.Context) string {
 	if value, ok := ctx.Value(userIDContextKey).(string); ok {
+		return value
+	}
+	return ""
+}
+
+func SessionIDFromContext(ctx context.Context) string {
+	if value, ok := ctx.Value(sessionIDContextKey).(string); ok {
 		return value
 	}
 	return ""
@@ -24,11 +32,15 @@ func Middleware(service *Service, next http.Handler) http.Handler {
 			http.Error(w, "missing authorization header", http.StatusUnauthorized)
 			return
 		}
-		userID, err := service.ParseAccessToken(authHeader)
+		claims, err := service.ParseAccessTokenClaims(authHeader)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userIDContextKey, userID)))
+		ctx := context.WithValue(r.Context(), userIDContextKey, claims.UserID)
+		if claims.SessionID != "" {
+			ctx = context.WithValue(ctx, sessionIDContextKey, claims.SessionID)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

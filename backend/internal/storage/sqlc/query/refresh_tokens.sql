@@ -17,8 +17,19 @@ RETURNING *;
 UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL;
 
 -- name: RevokeRefreshTokenFamily :exec
-UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP
-WHERE id = ? OR parent_id = ?;
+WITH RECURSIVE family(id) AS (
+    SELECT id FROM refresh_tokens WHERE id = ?
+    UNION
+    SELECT rt.id
+    FROM refresh_tokens rt
+    JOIN family f ON rt.parent_id = f.id
+)
+UPDATE refresh_tokens
+SET revoked_at = CURRENT_TIMESTAMP
+WHERE id IN (SELECT id FROM family);
+
+-- name: RevokeRefreshTokenByID :exec
+UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE id = ? AND revoked_at IS NULL;
 
 -- name: CleanupExpiredTokens :exec
 DELETE FROM refresh_tokens WHERE expires_at < CURRENT_TIMESTAMP;

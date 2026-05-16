@@ -29,6 +29,12 @@ type Service struct {
 	loginWindow map[string][]time.Time
 }
 
+type AccessTokenClaims struct {
+	UserID    string
+	SessionID string
+	ExpiresAt int64
+}
+
 func NewService(store storage.Provider, secret string) *Service {
 	return &Service{
 		store:       store,
@@ -75,13 +81,24 @@ func (s *Service) RegisterWithDevice(ctx context.Context, userName, email, passw
 		return UserInfo{}, TokenPair{}, err
 	}
 
-	pair, sessionID, err := s.issueTokenPairWithSession(ctx, record, "", deviceName, ipAddress, userAgent)
+	if err := s.store.CreateAuthMethod(ctx, storage.AuthMethodRecord{
+		ID:             randomID("auth"),
+		UserID:         record.ID,
+		ProviderType:   "password",
+		ProviderUserID: record.ID,
+		Metadata:       fmt.Sprintf(`{"userName":%q}`, record.UserName),
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
+		return UserInfo{}, TokenPair{}, err
+	}
+
+	pair, _, err := s.issueTokenPairWithSession(ctx, record, "", "", deviceName, ipAddress, userAgent)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
 
 	_ = s.writeAuditLog(ctx, record.ID, "register", ipAddress, userAgent, "")
-	_ = sessionID // session 已创建
 
 	return toUserInfo(record), pair, nil
 }
@@ -124,13 +141,24 @@ func (s *Service) RegisterAdminWithDevice(ctx context.Context, userName, email, 
 		return UserInfo{}, TokenPair{}, err
 	}
 
-	pair, sessionID, err := s.issueTokenPairWithSession(ctx, record, "", deviceName, ipAddress, userAgent)
+	if err := s.store.CreateAuthMethod(ctx, storage.AuthMethodRecord{
+		ID:             randomID("auth"),
+		UserID:         record.ID,
+		ProviderType:   "password",
+		ProviderUserID: record.ID,
+		Metadata:       fmt.Sprintf(`{"userName":%q}`, record.UserName),
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
+		return UserInfo{}, TokenPair{}, err
+	}
+
+	pair, _, err := s.issueTokenPairWithSession(ctx, record, "", "", deviceName, ipAddress, userAgent)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
 
 	_ = s.writeAuditLog(ctx, record.ID, "register", ipAddress, userAgent, "")
-	_ = sessionID
 
 	return toUserInfo(record), pair, nil
 }
@@ -158,7 +186,7 @@ func (s *Service) LoginWithDevice(ctx context.Context, remoteAddr, userName, pas
 		}
 	}
 
-	pair, _, err := s.issueTokenPairWithSession(ctx, record, "", deviceName, ipAddress, userAgent)
+	pair, _, err := s.issueTokenPairWithSession(ctx, record, "", "", deviceName, ipAddress, userAgent)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
@@ -177,11 +205,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 
 	record, err := s.store.ConsumeRefreshToken(ctx, tokenHash)
 	if err != nil {
-		// 重放检测：如果 token 已被撤销，撤销整族
-		if anyRecord, findErr := s.store.FindAnyRefreshTokenByHash(ctx, tokenHash); findErr == nil && !anyRecord.RevokedAt.IsZero() {
-			_ = s.store.RevokeRefreshTokenFamily(ctx, anyRecord.ID)
-		}
-		return TokenPair{}, fmt.Errorf("refresh token invalid or expired")
+		return TokenPair{}, s.classifyRefreshFailure(ctx, tokenHash)
 	}
 
 	user, err := s.store.GetUser(ctx, record.UserID)
@@ -189,7 +213,20 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 		return TokenPair{}, err
 	}
 
-	pair, _, err := s.issueTokenPairWithSession(ctx, user, record.ID, "", "", "")
+	var (
+		sessionID  string
+		deviceName string
+		ipAddress  string
+		userAgent  string
+	)
+	if session, sessionErr := s.store.GetSessionByRefreshTokenID(ctx, record.ID); sessionErr == nil {
+		sessionID = session.ID
+		deviceName = session.DeviceName
+		ipAddress = session.IPAddress
+		userAgent = session.UserAgent
+	}
+
+	pair, _, err := s.issueTokenPairWithSession(ctx, user, record.ID, sessionID, deviceName, ipAddress, userAgent)
 	if err != nil {
 		return TokenPair{}, err
 	}
@@ -204,10 +241,14 @@ func (s *Service) RevokeRefreshToken(ctx context.Context, refreshToken string) e
 		return nil
 	}
 	record, err := s.store.ConsumeRefreshToken(ctx, hashToken(refreshToken))
-	if err == nil {
-		_ = s.writeAuditLog(ctx, record.UserID, "logout", "", "", "")
+	if err != nil {
+		return err
 	}
-	return err
+	if session, sessionErr := s.store.GetSessionByRefreshTokenID(ctx, record.ID); sessionErr == nil {
+		_ = s.store.RevokeSession(ctx, session.ID)
+	}
+	_ = s.writeAuditLog(ctx, record.UserID, "logout", "", "", "")
+	return nil
 }
 
 func (s *Service) UserInfo(ctx context.Context, userID string) (UserInfo, error) {
@@ -220,49 +261,65 @@ func (s *Service) UserInfo(ctx context.Context, userID string) (UserInfo, error)
 
 // IssueTokenPairForUser 为已验证的用户签发 token pair（Passkey 登录用）
 func (s *Service) IssueTokenPairForUser(ctx context.Context, user storage.UserRecord, deviceName, ipAddress, userAgent string) (TokenPair, string, error) {
-	return s.issueTokenPairWithSession(ctx, user, "", deviceName, ipAddress, userAgent)
+	return s.issueTokenPairWithSession(ctx, user, "", "", deviceName, ipAddress, userAgent)
 }
 
 func (s *Service) ParseAccessToken(token string) (string, error) {
+	claims, err := s.ParseAccessTokenClaims(token)
+	if err != nil {
+		return "", err
+	}
+	return claims.UserID, nil
+}
+
+func (s *Service) ParseAccessTokenClaims(token string) (AccessTokenClaims, error) {
 	token = strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid token")
+		return AccessTokenClaims{}, fmt.Errorf("invalid token")
 	}
 
 	signingInput := strings.Join(parts[:2], ".")
 	expected := signHS256(signingInput, s.secret)
 	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
-		return "", fmt.Errorf("invalid token signature")
+		return AccessTokenClaims{}, fmt.Errorf("invalid token signature")
 	}
 
 	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", fmt.Errorf("decode token payload: %w", err)
+		return AccessTokenClaims{}, fmt.Errorf("decode token payload: %w", err)
 	}
 	var payload struct {
 		Sub string `json:"sub"`
+		Sid string `json:"sid"`
 		Exp int64  `json:"exp"`
 	}
 	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-		return "", fmt.Errorf("decode token json: %w", err)
+		return AccessTokenClaims{}, fmt.Errorf("decode token json: %w", err)
 	}
 	if payload.Sub == "" || time.Now().Unix() > payload.Exp {
-		return "", fmt.Errorf("token expired")
+		return AccessTokenClaims{}, fmt.Errorf("token expired")
 	}
-	return payload.Sub, nil
+	return AccessTokenClaims{
+		UserID:    payload.Sub,
+		SessionID: payload.Sid,
+		ExpiresAt: payload.Exp,
+	}, nil
 }
 
-func (s *Service) issueTokenPairWithSession(ctx context.Context, user storage.UserRecord, parentID, deviceName, ipAddress, userAgent string) (TokenPair, string, error) {
-	accessToken, err := s.buildAccessToken(user)
-	if err != nil {
-		return TokenPair{}, "", err
-	}
+func (s *Service) issueTokenPairWithSession(ctx context.Context, user storage.UserRecord, parentID, sessionID, deviceName, ipAddress, userAgent string) (TokenPair, string, error) {
 	refreshToken, refreshHash, err := buildRefreshToken()
 	if err != nil {
 		return TokenPair{}, "", err
 	}
 	refreshID := randomID("refresh")
+	if sessionID == "" {
+		sessionID = randomID("session")
+	}
+	accessToken, err := s.buildAccessToken(user, sessionID)
+	if err != nil {
+		return TokenPair{}, "", err
+	}
 	if err := s.store.SaveRefreshToken(ctx, storage.RefreshTokenRecord{
 		ID:        refreshID,
 		UserID:    user.ID,
@@ -274,19 +331,26 @@ func (s *Service) issueTokenPairWithSession(ctx context.Context, user storage.Us
 		return TokenPair{}, "", err
 	}
 
-	// 创建 Session 记录
-	sessionID := randomID("session")
-	_ = s.store.CreateSession(ctx, storage.SessionRecord{
-		ID:             sessionID,
-		UserID:         user.ID,
-		RefreshTokenID: refreshID,
-		DeviceName:     deviceName,
-		DeviceType:     detectDeviceType(userAgent),
-		IPAddress:      ipAddress,
-		UserAgent:      userAgent,
-		CreatedAt:      time.Now().UTC(),
-		LastSeenAt:     time.Now().UTC(),
-	})
+	now := time.Now().UTC()
+	if parentID == "" {
+		if err := s.store.CreateSession(ctx, storage.SessionRecord{
+			ID:             sessionID,
+			UserID:         user.ID,
+			RefreshTokenID: refreshID,
+			DeviceName:     deviceName,
+			DeviceType:     detectDeviceType(userAgent),
+			IPAddress:      ipAddress,
+			UserAgent:      userAgent,
+			CreatedAt:      now,
+			LastSeenAt:     now,
+		}); err != nil {
+			return TokenPair{}, "", err
+		}
+	} else {
+		if err := s.store.UpdateSessionRefreshToken(ctx, sessionID, refreshID); err != nil {
+			return TokenPair{}, "", err
+		}
+	}
 
 	return TokenPair{
 		AccessToken:  accessToken,
@@ -318,10 +382,15 @@ func (s *Service) writeAuditLog(ctx context.Context, userID, action, ipAddress, 
 	})
 }
 
-func (s *Service) buildAccessToken(user storage.UserRecord) (string, error) {
+func (s *Service) WriteAuditLog(ctx context.Context, userID, action, ipAddress, userAgent, detail string) error {
+	return s.writeAuditLog(ctx, userID, action, ipAddress, userAgent, detail)
+}
+
+func (s *Service) buildAccessToken(user storage.UserRecord, sessionID string) (string, error) {
 	headerBytes, _ := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT"})
 	payloadBytes, err := json.Marshal(map[string]any{
 		"sub":      user.ID,
+		"sid":      sessionID,
 		"userName": user.UserName,
 		"roles":    user.Roles,
 		"exp":      time.Now().Add(accessTokenTTL).Unix(),
@@ -439,6 +508,21 @@ func signHS256(input string, secret []byte) string {
 	mac := hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(input))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func (s *Service) classifyRefreshFailure(ctx context.Context, tokenHash string) error {
+	record, err := s.store.FindAnyRefreshTokenByHash(ctx, tokenHash)
+	if err != nil {
+		return fmt.Errorf("ERR_REFRESH_TOKEN_INVALID")
+	}
+	if !record.RevokedAt.IsZero() {
+		_ = s.store.RevokeRefreshTokenFamily(ctx, record.ID)
+		return fmt.Errorf("ERR_REFRESH_TOKEN_REPLAYED")
+	}
+	if time.Now().UTC().After(record.ExpiresAt) {
+		return fmt.Errorf("ERR_REFRESH_TOKEN_EXPIRED")
+	}
+	return fmt.Errorf("ERR_REFRESH_TOKEN_INVALID")
 }
 
 func randomID(prefix string) string {

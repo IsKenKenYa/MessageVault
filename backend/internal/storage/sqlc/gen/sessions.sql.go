@@ -60,6 +60,28 @@ func (q *Queries) GetSession(ctx context.Context, id string) (*Session, error) {
 	return &i, err
 }
 
+const getSessionByRefreshTokenID = `-- name: GetSessionByRefreshTokenID :one
+SELECT id, user_id, refresh_token_id, device_name, device_type, ip_address, user_agent, created_at, last_seen_at, revoked_at FROM sessions WHERE refresh_token_id = ? AND revoked_at IS NULL LIMIT 1
+`
+
+func (q *Queries) GetSessionByRefreshTokenID(ctx context.Context, refreshTokenID sql.NullString) (*Session, error) {
+	row := q.db.QueryRowContext(ctx, getSessionByRefreshTokenID, refreshTokenID)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.RefreshTokenID,
+		&i.DeviceName,
+		&i.DeviceType,
+		&i.IpAddress,
+		&i.UserAgent,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+	)
+	return &i, err
+}
+
 const listSessionsByUser = `-- name: ListSessionsByUser :many
 SELECT id, user_id, refresh_token_id, device_name, device_type, ip_address, user_agent, created_at, last_seen_at, revoked_at FROM sessions WHERE user_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC
 `
@@ -127,5 +149,21 @@ UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?
 
 func (q *Queries) UpdateSessionLastSeen(ctx context.Context, id string) error {
 	_, err := q.db.ExecContext(ctx, updateSessionLastSeen, id)
+	return err
+}
+
+const updateSessionRefreshToken = `-- name: UpdateSessionRefreshToken :exec
+UPDATE sessions
+SET refresh_token_id = ?, last_seen_at = CURRENT_TIMESTAMP
+WHERE id = ? AND revoked_at IS NULL
+`
+
+type UpdateSessionRefreshTokenParams struct {
+	RefreshTokenID sql.NullString `json:"refresh_token_id"`
+	ID             string         `json:"id"`
+}
+
+func (q *Queries) UpdateSessionRefreshToken(ctx context.Context, arg *UpdateSessionRefreshTokenParams) error {
+	_, err := q.db.ExecContext(ctx, updateSessionRefreshToken, arg.RefreshTokenID, arg.ID)
 	return err
 }
