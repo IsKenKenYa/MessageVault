@@ -65,15 +65,9 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	var req struct {
-		RefreshToken string `json:"refreshToken"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
-	refreshToken := req.RefreshToken
-	if refreshToken == "" {
-		if cookie, err := r.Cookie(refreshCookieName); err == nil {
-			refreshToken = cookie.Value
-		}
+	refreshToken := ""
+	if cookie, err := r.Cookie(refreshCookieName); err == nil {
+		refreshToken = cookie.Value
 	}
 	pair, err := s.auth.Refresh(r.Context(), refreshToken)
 	if err != nil {

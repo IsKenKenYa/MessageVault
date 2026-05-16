@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -92,6 +93,27 @@ func TestMobileRefreshRetryAllowsImmediateRetry(t *testing.T) {
 	secondRefresh := refreshMobileSession(t, handler, firstRefresh.RefreshToken)
 	if secondRefresh.Token == "" || secondRefresh.RefreshToken == "" {
 		t.Fatal("expected immediate retry path to preserve rotated session")
+	}
+}
+
+func TestRefreshRejectsBodyProvidedRefreshToken(t *testing.T) {
+	handler := newTestMobileHandler(t)
+	session := registerMobileSession(t, handler, "body-refresh-user", "body-refresh@example.com")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(mustJSON(t, map[string]string{
+		"refreshToken": session.RefreshToken,
+	})))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected body-only refresh to be rejected, got %d body=%s", res.Code, res.Body.String())
+	}
+	assertEnvelopeMessage(t, res.Body.Bytes(), "ERR_REFRESH_TOKEN_REQUIRED")
+
+	refreshed := refreshMobileSession(t, handler, session.RefreshToken)
+	if refreshed.Token == "" || refreshed.RefreshToken == "" {
+		t.Fatal("expected refresh cookie path to remain valid after rejecting body token")
 	}
 }
 
@@ -190,6 +212,41 @@ func TestUserInfoMissingUserUsesUnauthorizedEnvelope(t *testing.T) {
 	assertEnvelopeMessage(t, res.Body.Bytes(), "ERR_UNAUTHORIZED")
 	if strings.Contains(res.Body.String(), "not found") {
 		t.Fatalf("expected user info response to hide storage error, got %s", res.Body.String())
+	}
+}
+
+func TestAuthMiddlewareAllowsRequestWhenLastSeenUpdateFails(t *testing.T) {
+	_, store := newFileBackedTestServer(t, false)
+
+	user := createAuthTestUser(t, store, "last-seen-failure")
+	sessionID := "session-last-seen-failure"
+	lastSeenAt := time.Now().UTC().Add(-10 * time.Minute)
+	createAuthTestSession(t, store, user.ID, sessionID, lastSeenAt)
+
+	validator, err := msglayer.NewValidator(repoPath("msglayer", "schema", "v0.1", "root.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	failingStore := failingLastSeenProvider{
+		Provider:  store,
+		updateErr: errors.New("update failed"),
+	}
+	server := NewServer(config.Config{AuthSecret: "test-secret", TLS: false}, failingStore, validator)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/info", nil)
+	req.Header.Set("Authorization", "Bearer "+buildTestAccessToken(t, "test-secret", user.ID, sessionID, time.Now().Add(time.Hour)))
+	res := httptest.NewRecorder()
+	server.Handler().ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected valid request to survive last_seen_at update failure, got %d body=%s", res.Code, res.Body.String())
+	}
+
+	sessionAfter, err := store.GetSession(context.Background(), sessionID)
+	if err != nil {
+		t.Fatalf("get session after request: %v", err)
+	}
+	if !sessionAfter.LastSeenAt.Equal(lastSeenAt) {
+		t.Fatalf("expected last_seen_at to remain unchanged on failed update, got %v want %v", sessionAfter.LastSeenAt, lastSeenAt)
 	}
 }
 
@@ -311,4 +368,13 @@ func assertPersistentRefreshCookie(t *testing.T, res *httptest.ResponseRecorder)
 	if !strings.Contains(cookieHeader, "Expires=") {
 		t.Fatalf("expected persistent refresh cookie Expires, got %q", cookieHeader)
 	}
+}
+
+type failingLastSeenProvider struct {
+	storage.Provider
+	updateErr error
+}
+
+func (p failingLastSeenProvider) UpdateSessionLastSeen(context.Context, string) error {
+	return p.updateErr
 }

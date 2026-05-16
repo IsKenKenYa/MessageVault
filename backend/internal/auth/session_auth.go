@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/IsKenKenYa/Commory/backend/internal/storage"
@@ -26,7 +27,7 @@ func (s *Service) AuthenticateRequest(ctx context.Context, authHeader string) (A
 	}
 	if shouldUpdateSessionLastSeen(session, time.Now().UTC()) {
 		if err := s.UpdateSessionLastSeen(ctx, session.ID); err != nil {
-			return AccessTokenClaims{}, ErrUnauthorized
+			log.Printf("[auth] update session last_seen_at for %s: %v", session.ID, err)
 		}
 	}
 	return claims, nil
