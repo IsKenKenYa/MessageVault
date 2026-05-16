@@ -22,3 +22,8 @@ WHERE id = ? OR parent_id = ?;
 
 -- name: CleanupExpiredTokens :exec
 DELETE FROM refresh_tokens WHERE expires_at < CURRENT_TIMESTAMP;
+
+-- name: FindAnyRefreshTokenByHash :one
+SELECT * FROM refresh_tokens
+WHERE token_hash = ?
+LIMIT 1;

@@ -42,6 +42,27 @@ func (q *Queries) ConsumeRefreshToken(ctx context.Context, tokenHash string) (*R
 	return &i, err
 }
 
+const findAnyRefreshTokenByHash = `-- name: FindAnyRefreshTokenByHash :one
+SELECT id, user_id, token_hash, parent_id, expires_at, created_at, revoked_at FROM refresh_tokens
+WHERE token_hash = ?
+LIMIT 1
+`
+
+func (q *Queries) FindAnyRefreshTokenByHash(ctx context.Context, tokenHash string) (*RefreshToken, error) {
+	row := q.db.QueryRowContext(ctx, findAnyRefreshTokenByHash, tokenHash)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ParentID,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.RevokedAt,
+	)
+	return &i, err
+}
+
 const findRefreshTokenByHash = `-- name: FindRefreshTokenByHash :one
 SELECT id, user_id, token_hash, parent_id, expires_at, created_at, revoked_at FROM refresh_tokens
 WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP

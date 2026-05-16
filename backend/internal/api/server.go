@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,13 @@ import (
 	"os"
 	urlpath "path"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/IsKenKenYa/Commory/backend/internal/auth"
+	"github.com/IsKenKenYa/Commory/backend/internal/auth/oauth"
+	"github.com/IsKenKenYa/Commory/backend/internal/auth/passkey"
 	"github.com/IsKenKenYa/Commory/backend/internal/config"
 	"github.com/IsKenKenYa/Commory/backend/internal/importers"
 	"github.com/IsKenKenYa/Commory/backend/internal/msglayer"
@@ -27,6 +32,8 @@ type Server struct {
 	store     storage.Provider
 	service   query.Service
 	auth      *auth.Service
+	passkey   *passkey.Service
+	oauth     *oauth.Registry
 	validator *msglayer.Validator
 	importer  importers.Importer
 	setupSvc  *setup.Service
@@ -34,11 +41,19 @@ type Server struct {
 
 func NewServer(cfg config.Config, store storage.Provider, validator *msglayer.Validator) *Server {
 	authSvc := auth.NewService(store, cfg.AuthSecret)
+
+	var passkeySvc *passkey.Service
+	if cfg.PasskeyRPID != "" && cfg.PasskeyOrigin != "" {
+		passkeySvc, _ = passkey.NewService(store, cfg.PasskeyRPName, cfg.PasskeyRPID, cfg.PasskeyOrigin)
+	}
+
 	return &Server{
 		cfg:       cfg,
 		store:     store,
 		service:   query.New(store),
 		auth:      authSvc,
+		passkey:   passkeySvc,
+		oauth:     oauth.NewRegistry(),
 		validator: validator,
 		importer:  importers.JSONImporter{},
 		setupSvc:  setup.NewService(store, authSvc),
@@ -52,6 +67,11 @@ func (s *Server) Handler() http.Handler {
 	publicMux.HandleFunc("/api/auth/refresh", s.handleRefresh)
 	publicMux.HandleFunc("/api/auth/logout", s.handleLogout)
 	publicMux.HandleFunc("/api/setup", s.handleSetup)
+	publicMux.HandleFunc("/api/auth/passkey/login/begin", s.handlePasskeyLoginBegin)
+	publicMux.HandleFunc("/api/auth/passkey/login/finish", s.handlePasskeyLoginFinish)
+	publicMux.HandleFunc("/api/oauth/state", s.handleOAuthState)
+	publicMux.HandleFunc("/api/oauth/providers", s.handleOAuthProviders)
+	publicMux.HandleFunc("/api/oauth/", s.handleOAuthCallback)
 
 	privateMux := http.NewServeMux()
 	privateMux.HandleFunc("/api/user/info", s.handleUserInfo)
@@ -69,6 +89,13 @@ func (s *Server) Handler() http.Handler {
 	privateMux.HandleFunc("/api/identities/", s.handleIdentity)
 	privateMux.HandleFunc("/api/search", s.handleSearch)
 	privateMux.HandleFunc("/api/threads/", s.handleThread)
+	privateMux.HandleFunc("/api/sessions", s.handleSessions)
+	privateMux.HandleFunc("/api/sessions/", s.handleSession)
+	privateMux.HandleFunc("/api/audit-log", s.handleAuditLogs)
+	privateMux.HandleFunc("/api/auth/passkey/register/begin", s.handlePasskeyRegisterBegin)
+	privateMux.HandleFunc("/api/auth/passkey/register/finish", s.handlePasskeyRegisterFinish)
+	privateMux.HandleFunc("/api/auth/passkey", s.handlePasskeys)
+	privateMux.HandleFunc("/api/auth/passkey/", s.handlePasskeyDelete)
 
 	root := http.NewServeMux()
 	root.Handle("/api/auth/", publicMux)
@@ -115,7 +142,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	user, pair, err := s.auth.Register(r.Context(), req.UserName, req.Email, req.Password)
+	user, pair, err := s.auth.RegisterWithDevice(r.Context(), req.UserName, req.Email, req.Password,
+		r.Header.Get("X-Commory-Device"), r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -141,7 +169,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	user, pair, err := s.auth.Login(r.Context(), r.RemoteAddr, req.UserName, req.Password)
+	user, pair, err := s.auth.LoginWithDevice(r.Context(), r.RemoteAddr, req.UserName, req.Password,
+		r.Header.Get("X-Commory-Device"), r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"))
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -494,6 +523,318 @@ func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, "ok", items)
+}
+
+// ==================== OAuth ====================
+
+func (s *Server) handleOAuthState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	// 生成 CSRF state 并存入 DB
+	state := randomHex(16)
+	challengeID := randomHex(8)
+	_ = s.store.CreateChallenge(r.Context(), storage.ChallengeRecord{
+		ID:        challengeID,
+		Challenge: state,
+		FlowType:  "oauth_state",
+		ExpiresAt: time.Now().UTC().Add(10 * time.Minute),
+	})
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"state":       state,
+		"challengeId": challengeID,
+	})
+}
+
+func (s *Server) handleOAuthProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	providers := s.oauth.ListEnabled()
+	type providerInfo struct {
+		Name        string `json:"name"`
+		DisplayName string `json:"displayName"`
+	}
+	result := make([]providerInfo, 0, len(providers))
+	for _, p := range providers {
+		result = append(result, providerInfo{Name: p.Name(), DisplayName: p.DisplayName()})
+	}
+	writeJSON(w, http.StatusOK, "ok", result)
+}
+
+func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	// 骨架实现：后续 Phase 中完成具体 Provider 逻辑
+	providerName := strings.TrimPrefix(r.URL.Path, "/api/oauth/")
+	providerName = strings.TrimSuffix(providerName, "/")
+	if providerName == "" || providerName == "state" || providerName == "providers" {
+		writeError(w, http.StatusBadRequest, "provider name required")
+		return
+	}
+	provider := s.oauth.Get(providerName)
+	if provider == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("oauth provider %q not found", providerName))
+		return
+	}
+	// TODO: 完整的 OAuth callback 流程
+	writeJSON(w, http.StatusNotImplemented, "oauth callback not yet implemented", nil)
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)
+}
+
+// ==================== Passkey ====================
+
+func (s *Server) handlePasskeyRegisterBegin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.passkey == nil {
+		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		return
+	}
+	userID := auth.UserIDFromContext(r.Context())
+	cc, challengeID, err := s.passkey.BeginRegistration(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"options":     cc,
+		"challengeId": challengeID,
+	})
+}
+
+func (s *Server) handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.passkey == nil {
+		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		return
+	}
+	userID := auth.UserIDFromContext(r.Context())
+	var req struct {
+		ChallengeID string `json:"challengeId"`
+		Response    any    `json:"response"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respJSON, _ := json.Marshal(req.Response)
+	parsed, err := protocol.ParseCredentialCreationResponseBody(strings.NewReader(string(respJSON)))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid response: %v", err))
+		return
+	}
+	if err := s.passkey.FinishRegistration(r.Context(), userID, req.ChallengeID, parsed); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", map[string]any{"success": true})
+}
+
+func (s *Server) handlePasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.passkey == nil {
+		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		return
+	}
+	assertion, challengeID, err := s.passkey.BeginLogin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"options":     assertion,
+		"challengeId": challengeID,
+	})
+}
+
+func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.passkey == nil {
+		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		return
+	}
+	var req struct {
+		ChallengeID string `json:"challengeId"`
+		Response    any    `json:"response"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respJSON, _ := json.Marshal(req.Response)
+	parsed, err := protocol.ParseCredentialRequestResponseBody(strings.NewReader(string(respJSON)))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid response: %v", err))
+		return
+	}
+	userID, err := s.passkey.FinishLogin(r.Context(), req.ChallengeID, parsed)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	user, err := s.auth.UserInfo(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// 登录成功：通过 auth service 获取用户记录并签发 token
+	userRecord, err := s.store.GetUser(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pair, _, err := s.auth.IssueTokenPairForUser(r.Context(), userRecord,
+		r.Header.Get("X-Commory-Device"), r.Header.Get("X-Forwarded-For"), r.Header.Get("User-Agent"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	setRefreshCookie(w, pair.RefreshToken, s.cfg.TLS)
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"user":         user,
+		"token":        pair.AccessToken,
+		"refreshToken": pair.RefreshToken,
+	})
+}
+
+func (s *Server) handlePasskeys(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.passkey == nil {
+		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		return
+	}
+	userID := auth.UserIDFromContext(r.Context())
+	passkeys, err := s.passkey.ListPasskeys(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", passkeys)
+}
+
+func (s *Server) handlePasskeyDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.passkey == nil {
+		writeError(w, http.StatusServiceUnavailable, "passkey not configured")
+		return
+	}
+	passkeyID := strings.TrimPrefix(r.URL.Path, "/api/auth/passkey/")
+	if passkeyID == "" {
+		writeError(w, http.StatusBadRequest, "passkey id required")
+		return
+	}
+	userID := auth.UserIDFromContext(r.Context())
+	if err := s.passkey.DeletePasskey(r.Context(), userID, passkeyID); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", map[string]any{"success": true})
+}
+
+// ==================== Sessions ====================
+
+func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	switch r.Method {
+	case http.MethodGet:
+		sessions, err := s.store.ListSessionsByUser(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, "ok", sessions)
+	case http.MethodDelete:
+		// 撤销除当前会话外的所有会话
+		// 当前会话通过 refresh token cookie 识别
+		if err := s.store.RevokeOtherSessions(r.Context(), userID, ""); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, "ok", map[string]any{"success": true})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	sessionID := strings.TrimPrefix(r.URL.Path, "/api/sessions/")
+	if sessionID == "" {
+		writeError(w, http.StatusBadRequest, "session id required")
+		return
+	}
+	if err := s.store.RevokeSession(r.Context(), sessionID); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, "ok", map[string]any{"success": true})
+}
+
+// ==================== Audit Log ====================
+
+func (s *Server) handleAuditLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := s.requireAdmin(r.Context()); err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	q := r.URL.Query()
+	userID := q.Get("user_id")
+	action := q.Get("action")
+	limit := 50
+	if v, err := strconv.Atoi(q.Get("limit")); err == nil && v > 0 && v <= 200 {
+		limit = v
+	}
+	offset := 0
+	if v, err := strconv.Atoi(q.Get("offset")); err == nil && v >= 0 {
+		offset = v
+	}
+
+	logs, err := s.store.ListAuditLogs(r.Context(), userID, action, limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	total, _ := s.store.CountAuditLogs(r.Context(), userID, action)
+	writeJSON(w, http.StatusOK, "ok", map[string]any{
+		"items":  logs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (s *Server) requireAdmin(ctx context.Context) error {

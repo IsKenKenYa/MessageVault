@@ -18,6 +18,17 @@ import (
 //go:embed migrations/sqlite/0001_initial.up.sql
 var sqliteMigration001 string
 
+//go:embed migrations/sqlite/0002_auth_hardening.up.sql
+var sqliteMigration002 string
+
+var sqliteMigrations = []struct {
+	Version int
+	SQL     string
+}{
+	{1, sqliteMigration001},
+	{2, sqliteMigration002},
+}
+
 type sqliteProvider struct {
 	db  *sql.DB
 	q   *sqlc.Queries
@@ -42,10 +53,29 @@ func (s *sqliteProvider) Name() string { return "sqlite" }
 func (s *sqliteProvider) Close() error { return s.db.Close() }
 
 func (s *sqliteProvider) Init(ctx context.Context) error {
-	// 运行迁移
-	if _, err := s.db.ExecContext(ctx, sqliteMigration001); err != nil {
-		return fmt.Errorf("run migration 0001: %w", err)
+	// 确保 schema_migrations 表存在
+	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version BIGINT PRIMARY KEY, dirty BOOLEAN NOT NULL DEFAULT FALSE)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
 	}
+
+	// 获取当前已应用的最高版本
+	currentVersion := 0
+	row := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_migrations`)
+	_ = row.Scan(&currentVersion)
+
+	// 按顺序应用未执行的迁移
+	for _, m := range sqliteMigrations {
+		if m.Version <= currentVersion {
+			continue
+		}
+		if _, err := s.db.ExecContext(ctx, m.SQL); err != nil {
+			return fmt.Errorf("run migration %04d: %w", m.Version, err)
+		}
+		if _, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO schema_migrations (version, dirty) VALUES (?, FALSE)`, m.Version); err != nil {
+			return fmt.Errorf("record migration %04d: %w", m.Version, err)
+		}
+	}
+
 	return nil
 }
 
@@ -420,12 +450,267 @@ func (s *sqliteProvider) HasAdminUser(ctx context.Context) (bool, error) {
 	return s.q.HasAdminUser(ctx)
 }
 
-func (s *sqliteProvider) UpdateUserPasswordHash(ctx context.Context, userID, newHash string) error {
+func (s *sqliteProvider) UpdateUserPasswordHash(ctx context.Context, userID, newHash, newSalt string) error {
 	return s.q.UpdateUserPasswordHash(ctx, &sqlc.UpdateUserPasswordHashParams{
 		PasswordHash: newHash,
-		PasswordSalt: "",
+		PasswordSalt: newSalt,
 		ID:           userID,
 	})
+}
+
+// ==================== Refresh Token 族 ====================
+
+func (s *sqliteProvider) FindAnyRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshTokenRecord, error) {
+	row, err := s.q.FindAnyRefreshTokenByHash(ctx, tokenHash)
+	if err != nil {
+		return RefreshTokenRecord{}, err
+	}
+	return RefreshTokenRecord{
+		ID:        row.ID,
+		UserID:    row.UserID,
+		TokenHash: row.TokenHash,
+		ParentID:  row.ParentID.String,
+		ExpiresAt: row.ExpiresAt,
+		CreatedAt: row.CreatedAt,
+		RevokedAt: row.RevokedAt.Time,
+	}, nil
+}
+
+func (s *sqliteProvider) RevokeRefreshTokenFamily(ctx context.Context, tokenID string) error {
+	return s.q.RevokeRefreshTokenFamily(ctx, &sqlc.RevokeRefreshTokenFamilyParams{
+		ID:       tokenID,
+		ParentID: sql.NullString{String: tokenID, Valid: true},
+	})
+}
+
+// ==================== Sessions ====================
+
+func (s *sqliteProvider) CreateSession(ctx context.Context, rec SessionRecord) error {
+	return s.q.CreateSession(ctx, &sqlc.CreateSessionParams{
+		ID:             rec.ID,
+		UserID:         rec.UserID,
+		RefreshTokenID: sql.NullString{String: rec.RefreshTokenID, Valid: rec.RefreshTokenID != ""},
+		DeviceName:     sql.NullString{String: rec.DeviceName, Valid: rec.DeviceName != ""},
+		DeviceType:     sql.NullString{String: rec.DeviceType, Valid: rec.DeviceType != ""},
+		IpAddress:      sql.NullString{String: rec.IPAddress, Valid: rec.IPAddress != ""},
+		UserAgent:      sql.NullString{String: rec.UserAgent, Valid: rec.UserAgent != ""},
+	})
+}
+
+func (s *sqliteProvider) ListSessionsByUser(ctx context.Context, userID string) ([]SessionRecord, error) {
+	rows, err := s.q.ListSessionsByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]SessionRecord, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, SessionRecord{
+			ID:             r.ID,
+			UserID:         r.UserID,
+			RefreshTokenID: r.RefreshTokenID.String,
+			DeviceName:     r.DeviceName.String,
+			DeviceType:     r.DeviceType.String,
+			IPAddress:      r.IpAddress.String,
+			UserAgent:      r.UserAgent.String,
+			CreatedAt:      r.CreatedAt,
+			LastSeenAt:     r.LastSeenAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *sqliteProvider) RevokeSession(ctx context.Context, sessionID string) error {
+	return s.q.RevokeSession(ctx, sessionID)
+}
+
+func (s *sqliteProvider) RevokeOtherSessions(ctx context.Context, userID, currentSessionID string) error {
+	return s.q.RevokeOtherSessions(ctx, &sqlc.RevokeOtherSessionsParams{
+		UserID: userID,
+		ID:     currentSessionID,
+	})
+}
+
+func (s *sqliteProvider) UpdateSessionLastSeen(ctx context.Context, sessionID string) error {
+	return s.q.UpdateSessionLastSeen(ctx, sessionID)
+}
+
+// ==================== Audit Log ====================
+
+func (s *sqliteProvider) CreateAuditLog(ctx context.Context, rec AuditRecord) error {
+	return s.q.CreateAuditLog(ctx, &sqlc.CreateAuditLogParams{
+		ID:        rec.ID,
+		UserID:    sql.NullString{String: rec.UserID, Valid: rec.UserID != ""},
+		Action:    rec.Action,
+		IpAddress: sql.NullString{String: rec.IPAddress, Valid: rec.IPAddress != ""},
+		UserAgent: sql.NullString{String: rec.UserAgent, Valid: rec.UserAgent != ""},
+		Detail:    sql.NullString{String: rec.Detail, Valid: rec.Detail != ""},
+	})
+}
+
+func (s *sqliteProvider) ListAuditLogs(ctx context.Context, userID, action string, limit, offset int) ([]AuditRecord, error) {
+	rows, err := s.q.GetAuditLogs(ctx, &sqlc.GetAuditLogsParams{
+		UserID: userID,
+		Action: action,
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	items := make([]AuditRecord, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, AuditRecord{
+			ID:        r.ID,
+			UserID:    r.UserID.String,
+			Action:    r.Action,
+			IPAddress: r.IpAddress.String,
+			UserAgent: r.UserAgent.String,
+			Detail:    r.Detail.String,
+			CreatedAt: r.CreatedAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *sqliteProvider) CountAuditLogs(ctx context.Context, userID, action string) (int, error) {
+	count, err := s.q.CountAuditLogs(ctx, &sqlc.CountAuditLogsParams{
+		UserID: userID,
+		Action: action,
+	})
+	return int(count), err
+}
+
+// ==================== Passkey ====================
+
+func (s *sqliteProvider) CreatePasskeyCredential(ctx context.Context, rec PasskeyCredential) error {
+	return s.q.CreatePasskeyCredential(ctx, &sqlc.CreatePasskeyCredentialParams{
+		ID:              rec.ID,
+		UserID:          rec.UserID,
+		CredentialID:    rec.CredentialID,
+		PublicKey:       rec.PublicKey,
+		AttestationType: rec.AttestationType,
+		Aaguid:          rec.AAGUID,
+		SignCount:       int64(rec.SignCount),
+		Transports:      rec.Transports,
+		Name:            rec.Name,
+	})
+}
+
+func (s *sqliteProvider) GetPasskeyByCredentialID(ctx context.Context, credentialID string) (PasskeyCredential, error) {
+	row, err := s.q.GetPasskeyByCredentialID(ctx, credentialID)
+	if err != nil {
+		return PasskeyCredential{}, err
+	}
+	return PasskeyCredential{
+		ID:              row.ID,
+		UserID:          row.UserID,
+		CredentialID:    row.CredentialID,
+		PublicKey:       row.PublicKey,
+		AttestationType: row.AttestationType,
+		AAGUID:          row.Aaguid,
+		SignCount:       uint32(row.SignCount),
+		Transports:      row.Transports,
+		Name:            row.Name,
+		LastUsedAt:      row.LastUsedAt.Time,
+		CreatedAt:       row.CreatedAt,
+	}, nil
+}
+
+func (s *sqliteProvider) ListPasskeysByUser(ctx context.Context, userID string) ([]PasskeyCredential, error) {
+	rows, err := s.q.ListPasskeysByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]PasskeyCredential, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, PasskeyCredential{
+			ID:              r.ID,
+			UserID:          r.UserID,
+			CredentialID:    r.CredentialID,
+			PublicKey:       r.PublicKey,
+			AttestationType: r.AttestationType,
+			AAGUID:          r.Aaguid,
+			SignCount:       uint32(r.SignCount),
+			Transports:      r.Transports,
+			Name:            r.Name,
+			LastUsedAt:      r.LastUsedAt.Time,
+			CreatedAt:       r.CreatedAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *sqliteProvider) UpdatePasskeyLastUsed(ctx context.Context, id string, signCount uint32) error {
+	return s.q.UpdatePasskeyLastUsed(ctx, &sqlc.UpdatePasskeyLastUsedParams{
+		SignCount: int64(signCount),
+		ID:        id,
+	})
+}
+
+func (s *sqliteProvider) DeletePasskey(ctx context.Context, id, userID string) error {
+	return s.q.DeletePasskey(ctx, &sqlc.DeletePasskeyParams{ID: id, UserID: userID})
+}
+
+// ==================== Challenge ====================
+
+func (s *sqliteProvider) CreateChallenge(ctx context.Context, rec ChallengeRecord) error {
+	return s.q.CreateChallenge(ctx, &sqlc.CreateChallengeParams{
+		ID:        rec.ID,
+		Challenge: rec.Challenge,
+		UserID:    sql.NullString{String: rec.UserID, Valid: rec.UserID != ""},
+		FlowType:  rec.FlowType,
+		ExpiresAt: rec.ExpiresAt,
+	})
+}
+
+func (s *sqliteProvider) GetChallenge(ctx context.Context, id string) (ChallengeRecord, error) {
+	row, err := s.q.GetChallenge(ctx, id)
+	if err != nil {
+		return ChallengeRecord{}, err
+	}
+	return ChallengeRecord{
+		ID:        row.ID,
+		Challenge: row.Challenge,
+		UserID:    row.UserID.String,
+		FlowType:  row.FlowType,
+		ExpiresAt: row.ExpiresAt,
+		CreatedAt: row.CreatedAt,
+	}, nil
+}
+
+func (s *sqliteProvider) DeleteChallenge(ctx context.Context, id string) error {
+	return s.q.DeleteChallenge(ctx, id)
+}
+
+// ==================== Auth Methods ====================
+
+func (s *sqliteProvider) CreateAuthMethod(ctx context.Context, rec AuthMethodRecord) error {
+	return s.q.CreateAuthMethod(ctx, &sqlc.CreateAuthMethodParams{
+		ID:             rec.ID,
+		UserID:         rec.UserID,
+		ProviderType:   rec.ProviderType,
+		ProviderUserID: rec.ProviderUserID,
+		Metadata:       rec.Metadata,
+	})
+}
+
+func (s *sqliteProvider) GetAuthMethodByProvider(ctx context.Context, providerType, providerUserID string) (AuthMethodRecord, error) {
+	row, err := s.q.GetAuthMethodByProvider(ctx, &sqlc.GetAuthMethodByProviderParams{
+		ProviderType:   providerType,
+		ProviderUserID: providerUserID,
+	})
+	if err != nil {
+		return AuthMethodRecord{}, err
+	}
+	return AuthMethodRecord{
+		ID:             row.ID,
+		UserID:         row.UserID,
+		ProviderType:   row.ProviderType,
+		ProviderUserID: row.ProviderUserID,
+		Metadata:       row.Metadata,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+	}, nil
 }
 
 // ==================== Type conversions ====================

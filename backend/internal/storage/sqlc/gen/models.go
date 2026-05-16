@@ -19,6 +19,15 @@ type AuditLog struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
+type AuthChallenge struct {
+	ID        string         `json:"id"`
+	Challenge string         `json:"challenge"`
+	UserID    sql.NullString `json:"user_id"`
+	FlowType  string         `json:"flow_type"`
+	ExpiresAt time.Time      `json:"expires_at"`
+	CreatedAt time.Time      `json:"created_at"`
+}
+
 type Event struct {
 	ID             string         `json:"id"`
 	UserID         string         `json:"user_id"`
@@ -61,6 +70,20 @@ type Import struct {
 	EventCount    int64          `json:"event_count"`
 	IdentityCount int64          `json:"identity_count"`
 	RawJson       string         `json:"raw_json"`
+}
+
+type PasskeyCredential struct {
+	ID              string       `json:"id"`
+	UserID          string       `json:"user_id"`
+	CredentialID    string       `json:"credential_id"`
+	PublicKey       string       `json:"public_key"`
+	AttestationType string       `json:"attestation_type"`
+	Aaguid          string       `json:"aaguid"`
+	SignCount       int64        `json:"sign_count"`
+	Transports      string       `json:"transports"`
+	Name            string       `json:"name"`
+	LastUsedAt      sql.NullTime `json:"last_used_at"`
+	CreatedAt       time.Time    `json:"created_at"`
 }
 
 type RefreshToken struct {
@@ -115,4 +138,14 @@ type User struct {
 	Buttons      string         `json:"buttons"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
+}
+
+type UserAuthMethod struct {
+	ID             string    `json:"id"`
+	UserID         string    `json:"user_id"`
+	ProviderType   string    `json:"provider_type"`
+	ProviderUserID string    `json:"provider_user_id"`
+	Metadata       string    `json:"metadata"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }

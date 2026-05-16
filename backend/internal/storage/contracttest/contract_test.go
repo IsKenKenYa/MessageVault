@@ -24,6 +24,11 @@ func RunContractTests(t *testing.T, factory ProviderFactory) {
 	t.Run("IdentityCRUD", func(t *testing.T) { testIdentityCRUD(t, factory) })
 	t.Run("SearchPagination", func(t *testing.T) { testSearchPagination(t, factory) })
 	t.Run("SetupLifecycle", func(t *testing.T) { testSetupLifecycle(t, factory) })
+	t.Run("SessionLifecycle", func(t *testing.T) { testSessionLifecycle(t, factory) })
+	t.Run("AuditLog", func(t *testing.T) { testAuditLog(t, factory) })
+	t.Run("PasskeyCredential", func(t *testing.T) { testPasskeyCredential(t, factory) })
+	t.Run("ChallengeLifecycle", func(t *testing.T) { testChallengeLifecycle(t, factory) })
+	t.Run("AuthMethod", func(t *testing.T) { testAuthMethod(t, factory) })
 }
 
 func testUserLifecycle(t *testing.T, factory ProviderFactory) {
@@ -376,6 +381,200 @@ func testSetupLifecycle(t *testing.T, factory ProviderFactory) {
 	}
 	if status.Version != "1.0.0" {
 		t.Fatalf("expected version 1.0.0, got %s", status.Version)
+	}
+}
+
+func testSessionLifecycle(t *testing.T, factory ProviderFactory) {
+	store := factory(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	user := storage.UserRecord{
+		ID: uuid.New().String(), UserName: "sess_" + uuid.New().String()[:8],
+		PasswordHash: "h", PasswordSalt: "s", Roles: []string{"R_USER"}, Buttons: []string{"view"},
+	}
+	if _, err := store.CreateUser(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	session := storage.SessionRecord{
+		ID:        uuid.New().String(),
+		UserID:    user.ID,
+		IPAddress: "127.0.0.1",
+		UserAgent: "test-agent",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	sessions, err := store.ListSessionsByUser(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListSessionsByUser: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+
+	if err := store.UpdateSessionLastSeen(ctx, session.ID); err != nil {
+		t.Fatalf("UpdateSessionLastSeen: %v", err)
+	}
+
+	if err := store.RevokeSession(ctx, session.ID); err != nil {
+		t.Fatalf("RevokeSession: %v", err)
+	}
+
+	sessions, _ = store.ListSessionsByUser(ctx, user.ID)
+	if len(sessions) != 0 {
+		t.Fatalf("expected 0 sessions after revoke, got %d", len(sessions))
+	}
+}
+
+func testAuditLog(t *testing.T, factory ProviderFactory) {
+	store := factory(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	if err := store.CreateAuditLog(ctx, storage.AuditRecord{
+		ID: uuid.New().String(), Action: "login", IPAddress: "127.0.0.1",
+	}); err != nil {
+		t.Fatalf("CreateAuditLog: %v", err)
+	}
+
+	logs, err := store.ListAuditLogs(ctx, "", "", 10, 0)
+	if err != nil {
+		t.Fatalf("ListAuditLogs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log, got %d", len(logs))
+	}
+
+	total, err := store.CountAuditLogs(ctx, "", "")
+	if err != nil {
+		t.Fatalf("CountAuditLogs: %v", err)
+	}
+	if total != 1 {
+		t.Fatalf("expected total 1, got %d", total)
+	}
+}
+
+func testPasskeyCredential(t *testing.T, factory ProviderFactory) {
+	store := factory(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	user := storage.UserRecord{
+		ID: uuid.New().String(), UserName: "pk_" + uuid.New().String()[:8],
+		PasswordHash: "h", PasswordSalt: "s", Roles: []string{"R_USER"}, Buttons: []string{"view"},
+	}
+	if _, err := store.CreateUser(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	cred := storage.PasskeyCredential{
+		ID:           uuid.New().String(),
+		UserID:       user.ID,
+		CredentialID: "cred_" + uuid.New().String(),
+		PublicKey:    "pubkey_test",
+		Transports:   `["usb","nfc"]`,
+		Name:         "Test Key",
+	}
+	if err := store.CreatePasskeyCredential(ctx, cred); err != nil {
+		t.Fatalf("CreatePasskeyCredential: %v", err)
+	}
+
+	got, err := store.GetPasskeyByCredentialID(ctx, cred.CredentialID)
+	if err != nil {
+		t.Fatalf("GetPasskeyByCredentialID: %v", err)
+	}
+	if got.Name != "Test Key" {
+		t.Fatalf("name mismatch: %s", got.Name)
+	}
+
+	passkeys, err := store.ListPasskeysByUser(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListPasskeysByUser: %v", err)
+	}
+	if len(passkeys) != 1 {
+		t.Fatalf("expected 1 passkey, got %d", len(passkeys))
+	}
+
+	if err := store.UpdatePasskeyLastUsed(ctx, cred.ID, 42); err != nil {
+		t.Fatalf("UpdatePasskeyLastUsed: %v", err)
+	}
+
+	if err := store.DeletePasskey(ctx, cred.ID, user.ID); err != nil {
+		t.Fatalf("DeletePasskey: %v", err)
+	}
+
+	passkeys, _ = store.ListPasskeysByUser(ctx, user.ID)
+	if len(passkeys) != 0 {
+		t.Fatalf("expected 0 passkeys after delete, got %d", len(passkeys))
+	}
+}
+
+func testChallengeLifecycle(t *testing.T, factory ProviderFactory) {
+	store := factory(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	chal := storage.ChallengeRecord{
+		ID:        uuid.New().String(),
+		Challenge: "test_challenge_value",
+		FlowType:  "passkey_login",
+		ExpiresAt: time.Now().Add(5 * time.Minute).UTC(),
+	}
+	if err := store.CreateChallenge(ctx, chal); err != nil {
+		t.Fatalf("CreateChallenge: %v", err)
+	}
+
+	got, err := store.GetChallenge(ctx, chal.ID)
+	if err != nil {
+		t.Fatalf("GetChallenge: %v", err)
+	}
+	if got.Challenge != "test_challenge_value" {
+		t.Fatalf("challenge mismatch: %s", got.Challenge)
+	}
+
+	if err := store.DeleteChallenge(ctx, chal.ID); err != nil {
+		t.Fatalf("DeleteChallenge: %v", err)
+	}
+
+	_, err = store.GetChallenge(ctx, chal.ID)
+	if err == nil {
+		t.Fatal("expected error for deleted challenge")
+	}
+}
+
+func testAuthMethod(t *testing.T, factory ProviderFactory) {
+	store := factory(t)
+	defer store.Close()
+	ctx := context.Background()
+
+	user := storage.UserRecord{
+		ID: uuid.New().String(), UserName: "am_" + uuid.New().String()[:8],
+		PasswordHash: "h", PasswordSalt: "s", Roles: []string{"R_USER"}, Buttons: []string{"view"},
+	}
+	if _, err := store.CreateUser(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	method := storage.AuthMethodRecord{
+		ID:             uuid.New().String(),
+		UserID:         user.ID,
+		ProviderType:   "password",
+		ProviderUserID: user.ID,
+		Metadata:       "{}",
+	}
+	if err := store.CreateAuthMethod(ctx, method); err != nil {
+		t.Fatalf("CreateAuthMethod: %v", err)
+	}
+
+	got, err := store.GetAuthMethodByProvider(ctx, "password", user.ID)
+	if err != nil {
+		t.Fatalf("GetAuthMethodByProvider: %v", err)
+	}
+	if got.UserID != user.ID {
+		t.Fatalf("user ID mismatch: %s", got.UserID)
 	}
 }
 

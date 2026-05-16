@@ -417,7 +417,7 @@ func (s *fileStore) hasAdminUserLocked() (bool, error) {
 	return false, nil
 }
 
-func (s *fileStore) UpdateUserPasswordHash(ctx context.Context, userID, newHash string) error {
+func (s *fileStore) UpdateUserPasswordHash(ctx context.Context, userID, newHash, newSalt string) error {
 	_ = ctx
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -426,9 +426,92 @@ func (s *fileStore) UpdateUserPasswordHash(ctx context.Context, userID, newHash 
 		return fmt.Errorf("user not found")
 	}
 	user.PasswordHash = newHash
+	user.PasswordSalt = newSalt
 	user.UpdatedAt = time.Now().UTC()
 	s.snapshot.Users[userID] = user
 	return s.persist()
+}
+
+// ==================== 新增方法 stubs ====================
+
+func (s *fileStore) FindAnyRefreshTokenByHash(_ context.Context, _ string) (RefreshTokenRecord, error) {
+	return RefreshTokenRecord{}, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) RevokeRefreshTokenFamily(_ context.Context, _ string) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) CreateSession(_ context.Context, _ SessionRecord) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) ListSessionsByUser(_ context.Context, _ string) ([]SessionRecord, error) {
+	return nil, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) RevokeSession(_ context.Context, _ string) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) RevokeOtherSessions(_ context.Context, _, _ string) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) UpdateSessionLastSeen(_ context.Context, _ string) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) CreateAuditLog(_ context.Context, _ AuditRecord) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) ListAuditLogs(_ context.Context, _, _ string, _, _ int) ([]AuditRecord, error) {
+	return nil, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) CountAuditLogs(_ context.Context, _, _ string) (int, error) {
+	return 0, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) CreatePasskeyCredential(_ context.Context, _ PasskeyCredential) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) GetPasskeyByCredentialID(_ context.Context, _ string) (PasskeyCredential, error) {
+	return PasskeyCredential{}, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) ListPasskeysByUser(_ context.Context, _ string) ([]PasskeyCredential, error) {
+	return nil, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) UpdatePasskeyLastUsed(_ context.Context, _ string, _ uint32) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) DeletePasskey(_ context.Context, _, _ string) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) CreateChallenge(_ context.Context, _ ChallengeRecord) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) GetChallenge(_ context.Context, _ string) (ChallengeRecord, error) {
+	return ChallengeRecord{}, fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) DeleteChallenge(_ context.Context, _ string) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) CreateAuthMethod(_ context.Context, _ AuthMethodRecord) error {
+	return fmt.Errorf("not supported in fileStore")
+}
+
+func (s *fileStore) GetAuthMethodByProvider(_ context.Context, _, _ string) (AuthMethodRecord, error) {
+	return AuthMethodRecord{}, fmt.Errorf("not supported in fileStore")
 }
 
 func EnsureParentDir(path string) error {

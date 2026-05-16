@@ -17,6 +17,9 @@ type Config struct {
 	TLS              bool
 	Env              string
 	AllowedImportDir []string
+	PasskeyRPName    string
+	PasskeyRPID      string
+	PasskeyOrigin    string
 }
 
 func Load() (Config, error) {
@@ -37,6 +40,9 @@ func Load() (Config, error) {
 		TLS:              envBool("COMMORY_TLS", false),
 		Env:              env("COMMORY_ENV", "development"),
 		AllowedImportDir: splitAndClean(env("COMMORY_ALLOWED_IMPORT_DIRS", filepath.Join("..", "msglayer", "examples"))),
+		PasskeyRPName:    env("COMMORY_PASSKEY_RP_NAME", "Commory"),
+		PasskeyRPID:      env("COMMORY_PASSKEY_RP_ID", ""),
+		PasskeyOrigin:    env("COMMORY_PASSKEY_ORIGIN", ""),
 	}, nil
 }
 

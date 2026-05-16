@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	accessTokenTTL  = 30 * time.Minute
+	accessTokenTTL  = 15 * time.Minute
 	refreshTokenTTL = 7 * 24 * time.Hour
 )
 
@@ -38,6 +38,10 @@ func NewService(store storage.Provider, secret string) *Service {
 }
 
 func (s *Service) Register(ctx context.Context, userName, email, password string) (UserInfo, TokenPair, error) {
+	return s.RegisterWithDevice(ctx, userName, email, password, "", "", "")
+}
+
+func (s *Service) RegisterWithDevice(ctx context.Context, userName, email, password, deviceName, ipAddress, userAgent string) (UserInfo, TokenPair, error) {
 	userName = strings.TrimSpace(userName)
 	if userName == "" || strings.TrimSpace(password) == "" {
 		return UserInfo{}, TokenPair{}, fmt.Errorf("username and password are required")
@@ -71,14 +75,22 @@ func (s *Service) Register(ctx context.Context, userName, email, password string
 		return UserInfo{}, TokenPair{}, err
 	}
 
-	pair, err := s.issueTokenPair(ctx, record)
+	pair, sessionID, err := s.issueTokenPairWithSession(ctx, record, "", deviceName, ipAddress, userAgent)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
+
+	_ = s.writeAuditLog(ctx, record.ID, "register", ipAddress, userAgent, "")
+	_ = sessionID // session 已创建
+
 	return toUserInfo(record), pair, nil
 }
 
 func (s *Service) RegisterAdmin(ctx context.Context, userName, email, password string) (UserInfo, TokenPair, error) {
+	return s.RegisterAdminWithDevice(ctx, userName, email, password, "", "", "")
+}
+
+func (s *Service) RegisterAdminWithDevice(ctx context.Context, userName, email, password, deviceName, ipAddress, userAgent string) (UserInfo, TokenPair, error) {
 	userName = strings.TrimSpace(userName)
 	if userName == "" || strings.TrimSpace(password) == "" {
 		return UserInfo{}, TokenPair{}, fmt.Errorf("username and password are required")
@@ -112,14 +124,22 @@ func (s *Service) RegisterAdmin(ctx context.Context, userName, email, password s
 		return UserInfo{}, TokenPair{}, err
 	}
 
-	pair, err := s.issueTokenPair(ctx, record)
+	pair, sessionID, err := s.issueTokenPairWithSession(ctx, record, "", deviceName, ipAddress, userAgent)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
+
+	_ = s.writeAuditLog(ctx, record.ID, "register", ipAddress, userAgent, "")
+	_ = sessionID
+
 	return toUserInfo(record), pair, nil
 }
 
 func (s *Service) Login(ctx context.Context, remoteAddr, userName, password string) (UserInfo, TokenPair, error) {
+	return s.LoginWithDevice(ctx, remoteAddr, userName, password, "", "", "")
+}
+
+func (s *Service) LoginWithDevice(ctx context.Context, remoteAddr, userName, password, deviceName, ipAddress, userAgent string) (UserInfo, TokenPair, error) {
 	if err := s.allowLoginAttempt(remoteAddr); err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
@@ -133,15 +153,18 @@ func (s *Service) Login(ctx context.Context, remoteAddr, userName, password stri
 	}
 
 	if NeedsRehash(record.PasswordHash) {
-		if _, newHash, rehashErr := hashPassword(password); rehashErr == nil {
-			_ = s.store.UpdateUserPasswordHash(ctx, record.ID, newHash)
+		if newSalt, newHash, rehashErr := hashPassword(password); rehashErr == nil {
+			_ = s.store.UpdateUserPasswordHash(ctx, record.ID, newHash, newSalt)
 		}
 	}
 
-	pair, err := s.issueTokenPair(ctx, record)
+	pair, _, err := s.issueTokenPairWithSession(ctx, record, "", deviceName, ipAddress, userAgent)
 	if err != nil {
 		return UserInfo{}, TokenPair{}, err
 	}
+
+	_ = s.writeAuditLog(ctx, record.ID, "login", ipAddress, userAgent, `{"method":"password"}`)
+
 	return toUserInfo(record), pair, nil
 }
 
@@ -150,22 +173,40 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 	if token == "" {
 		return TokenPair{}, fmt.Errorf("refresh token is required")
 	}
-	record, err := s.store.ConsumeRefreshToken(ctx, hashToken(token))
+	tokenHash := hashToken(token)
+
+	record, err := s.store.ConsumeRefreshToken(ctx, tokenHash)
 	if err != nil {
-		return TokenPair{}, err
+		// 重放检测：如果 token 已被撤销，撤销整族
+		if anyRecord, findErr := s.store.FindAnyRefreshTokenByHash(ctx, tokenHash); findErr == nil && !anyRecord.RevokedAt.IsZero() {
+			_ = s.store.RevokeRefreshTokenFamily(ctx, anyRecord.ID)
+		}
+		return TokenPair{}, fmt.Errorf("refresh token invalid or expired")
 	}
+
 	user, err := s.store.GetUser(ctx, record.UserID)
 	if err != nil {
 		return TokenPair{}, err
 	}
-	return s.issueTokenPair(ctx, user)
+
+	pair, _, err := s.issueTokenPairWithSession(ctx, user, record.ID, "", "", "")
+	if err != nil {
+		return TokenPair{}, err
+	}
+
+	_ = s.writeAuditLog(ctx, user.ID, "token_refresh", "", "", "")
+
+	return pair, nil
 }
 
 func (s *Service) RevokeRefreshToken(ctx context.Context, refreshToken string) error {
 	if refreshToken == "" {
 		return nil
 	}
-	_, err := s.store.ConsumeRefreshToken(ctx, hashToken(refreshToken))
+	record, err := s.store.ConsumeRefreshToken(ctx, hashToken(refreshToken))
+	if err == nil {
+		_ = s.writeAuditLog(ctx, record.UserID, "logout", "", "", "")
+	}
 	return err
 }
 
@@ -175,6 +216,11 @@ func (s *Service) UserInfo(ctx context.Context, userID string) (UserInfo, error)
 		return UserInfo{}, err
 	}
 	return toUserInfo(user), nil
+}
+
+// IssueTokenPairForUser 为已验证的用户签发 token pair（Passkey 登录用）
+func (s *Service) IssueTokenPairForUser(ctx context.Context, user storage.UserRecord, deviceName, ipAddress, userAgent string) (TokenPair, string, error) {
+	return s.issueTokenPairWithSession(ctx, user, "", deviceName, ipAddress, userAgent)
 }
 
 func (s *Service) ParseAccessToken(token string) (string, error) {
@@ -207,28 +253,69 @@ func (s *Service) ParseAccessToken(token string) (string, error) {
 	return payload.Sub, nil
 }
 
-func (s *Service) issueTokenPair(ctx context.Context, user storage.UserRecord) (TokenPair, error) {
+func (s *Service) issueTokenPairWithSession(ctx context.Context, user storage.UserRecord, parentID, deviceName, ipAddress, userAgent string) (TokenPair, string, error) {
 	accessToken, err := s.buildAccessToken(user)
 	if err != nil {
-		return TokenPair{}, err
+		return TokenPair{}, "", err
 	}
 	refreshToken, refreshHash, err := buildRefreshToken()
 	if err != nil {
-		return TokenPair{}, err
+		return TokenPair{}, "", err
 	}
+	refreshID := randomID("refresh")
 	if err := s.store.SaveRefreshToken(ctx, storage.RefreshTokenRecord{
-		ID:        randomID("refresh"),
+		ID:        refreshID,
 		UserID:    user.ID,
 		TokenHash: refreshHash,
+		ParentID:  parentID,
 		ExpiresAt: time.Now().UTC().Add(refreshTokenTTL),
 		CreatedAt: time.Now().UTC(),
 	}); err != nil {
-		return TokenPair{}, err
+		return TokenPair{}, "", err
 	}
+
+	// 创建 Session 记录
+	sessionID := randomID("session")
+	_ = s.store.CreateSession(ctx, storage.SessionRecord{
+		ID:             sessionID,
+		UserID:         user.ID,
+		RefreshTokenID: refreshID,
+		DeviceName:     deviceName,
+		DeviceType:     detectDeviceType(userAgent),
+		IPAddress:      ipAddress,
+		UserAgent:      userAgent,
+		CreatedAt:      time.Now().UTC(),
+		LastSeenAt:     time.Now().UTC(),
+	})
+
 	return TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-	}, nil
+	}, sessionID, nil
+}
+
+func detectDeviceType(userAgent string) string {
+	ua := strings.ToLower(userAgent)
+	switch {
+	case strings.Contains(ua, "commory"):
+		return "android"
+	case strings.Contains(ua, "mozilla") || strings.Contains(ua, "chrome") || strings.Contains(ua, "safari"):
+		return "web"
+	default:
+		return "unknown"
+	}
+}
+
+func (s *Service) writeAuditLog(ctx context.Context, userID, action, ipAddress, userAgent, detail string) error {
+	return s.store.CreateAuditLog(ctx, storage.AuditRecord{
+		ID:        randomID("audit"),
+		UserID:    userID,
+		Action:    action,
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+		Detail:    detail,
+		CreatedAt: time.Now().UTC(),
+	})
 }
 
 func (s *Service) buildAccessToken(user storage.UserRecord) (string, error) {
