@@ -13,6 +13,14 @@ Commory Web 以 `references/art-design-pro` 为 UI 模板基线，以 `reference
 - 用户可见文案必须进入 `web/src/locales/langs/zh.json` 和 `web/src/locales/langs/en.json`。
 - Vue 模板使用 `$t(...)`，composition API 中使用 `useI18n()`。
 - 不在 `.vue`、`.ts` 中硬编码中文或英文用户文案。
+- 路由 `meta.title` 应使用 i18n key；`formatMenuTitle()` 负责把 key 转成当前语言文案，缺失 key 会在开发环境提示。
+
+## 权限模式
+
+- 当前产品默认保持 `VITE_ACCESS_MODE=frontend`；除非出现多租户、运营后台动态配置菜单或大量角色差异，不切换到 backend 菜单模式。
+- 路由 `meta.roles` 控制页面访问；登录用户的 `buttons` 权限码控制按钮级能力。
+- 前端模式下按钮显示优先使用 `useAuth().hasAuth()`，它会响应式读取 `userStore.info.buttons`。
+- `v-roles` 继续用于角色级 DOM 显示；`v-auth` 仅适用于 backend 菜单返回的 `meta.authList`，不要在当前 frontend 模式下把它作为按钮权限主路径。
 
 ## 暗色模式与主题
 

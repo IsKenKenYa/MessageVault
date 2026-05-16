@@ -22,7 +22,7 @@ export const staticRoutes: AppRouteRecordRaw[] = [
     path: '/setup',
     name: 'Setup',
     component: () => import('@views/setup/index.vue'),
-    meta: { title: '系统初始化', isHideTab: true }
+    meta: { title: 'menus.setup.title', isHideTab: true }
   },
   {
     path: '/auth/login',

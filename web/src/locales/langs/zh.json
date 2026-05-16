@@ -36,7 +36,35 @@
     "tips": "提示",
     "cancel": "取消",
     "confirm": "确定",
-    "logOutTips": "您是否要退出登录?"
+    "logOutTips": "您是否要退出登录?",
+    "save": "保存",
+    "edit": "编辑",
+    "add": "新增",
+    "delete": "删除",
+    "view": "查看",
+    "print": "打印",
+    "back": "返回",
+    "search": "搜索",
+    "reset": "重置",
+    "submit": "提交",
+    "success": "成功",
+    "failed": "失败",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "noData": "暂无数据",
+    "all": "全部",
+    "actions": "操作",
+    "status": "状态",
+    "createTime": "创建日期",
+    "unknown": "未知",
+    "unknownError": "未知错误",
+    "storageError": "系统检测到本地数据异常，请重新登录系统恢复使用！",
+    "systemUpgradedPrefix": "系统已升级到",
+    "systemUpgradedSuffix": "版本，此次更新带来了以下改进：",
+    "upgradeReLogin": "升级完成，请重新登录后继续使用。",
+    "invalidHexColor": "输入错误的 hex 颜色值",
+    "invalidRgbColor": "输入错误的 RGB 颜色值",
+    "selected": "已选择 {count} 项"
   },
   "search": {
     "placeholder": "搜索页面",
@@ -48,20 +76,11 @@
   "setting": {
     "menuType": {
       "title": "菜单布局",
-      "list": [
-        "垂直",
-        "水平",
-        "混合",
-        "双列"
-      ]
+      "list": ["垂直", "水平", "混合", "双列"]
     },
     "theme": {
       "title": "主题风格",
-      "list": [
-        "浅色",
-        "深色",
-        "系统"
-      ]
+      "list": ["浅色", "深色", "系统"]
     },
     "menu": {
       "title": "菜单风格"
@@ -71,17 +90,11 @@
     },
     "box": {
       "title": "盒子样式",
-      "list": [
-        "边框",
-        "阴影"
-      ]
+      "list": ["边框", "阴影"]
     },
     "container": {
       "title": "容器宽度",
-      "list": [
-        "铺满",
-        "定宽"
-      ]
+      "list": ["铺满", "定宽"]
     },
     "basics": {
       "title": "基础配置",
@@ -127,14 +140,8 @@
   "notice": {
     "title": "通知",
     "btnRead": "标为已读",
-    "bar": [
-      "通知",
-      "消息",
-      "代办"
-    ],
-    "text": [
-      "暂无"
-    ],
+    "bar": ["通知", "消息", "代办"],
+    "text": ["暂无"],
     "viewAll": "查看全部"
   },
   "worktab": {
@@ -182,7 +189,8 @@
     "subTitle": "输入您的电子邮件来重置您的密码",
     "placeholder": "请输入您的电子邮件",
     "submitBtnText": "提交",
-    "backBtnText": "返回"
+    "backBtnText": "返回",
+    "accountLabel": "账号"
   },
   "register": {
     "title": "创建账号",
@@ -204,7 +212,10 @@
     "privacyPolicy": "《隐私政策》",
     "submitBtnText": "注册",
     "hasAccount": "已有账号？",
-    "toLogin": "去登录"
+    "toLogin": "去登录",
+    "success": {
+      "message": "注册成功"
+    }
   },
   "lockScreen": {
     "pwdError": "密码错误",
@@ -269,6 +280,9 @@
       "role": "角色管理",
       "userCenter": "个人中心",
       "menu": "菜单管理"
+    },
+    "setup": {
+      "title": "系统初始化"
     }
   },
   "table": {
@@ -298,5 +312,391 @@
     "zebra": "斑马纹",
     "border": "边框",
     "headerBackground": "表头背景"
+  },
+  "setup": {
+    "brand": "Commory",
+    "title": "Commory 系统初始化",
+    "subtitle": "完成本地优先通信记忆系统的首次配置。",
+    "eyebrow": "本地优先 · 单端口部署",
+    "panelTitle": "初始化向导",
+    "panelSubtitle": "按步骤确认环境、管理员账号与使用模式。",
+    "loadingStatus": "正在检查初始化状态...",
+    "apiUnavailable": "暂时无法连接初始化接口，可继续填写并稍后提交。",
+    "steps": {
+      "database": "数据库检查",
+      "admin": "管理员账号",
+      "mode": "使用模式",
+      "finish": "完成初始化"
+    },
+    "database": {
+      "title": "数据库检查",
+      "desc": "确认当前存储与连接状态。",
+      "type": "SQLite 数据库",
+      "hint": "轻量级文件数据库，适合个人使用和小规模部署。",
+      "ready": "存储已就绪"
+    },
+    "admin": {
+      "title": "管理员账号",
+      "desc": "设置用于管理 Commory 的初始账号。",
+      "existsTitle": "管理员账号已存在",
+      "existsDesc": "系统中已有管理员用户，可直接进入下一步。",
+      "userName": "用户名",
+      "userNamePlaceholder": "请输入管理员用户名",
+      "password": "密码",
+      "passwordPlaceholder": "至少 8 个字符",
+      "confirmPassword": "确认密码",
+      "confirmPasswordPlaceholder": "再次输入密码",
+      "existing": "已存在",
+      "notSet": "未设置"
+    },
+    "mode": {
+      "title": "使用模式",
+      "desc": "选择初始化后默认启用的体验。",
+      "personal": "个人模式",
+      "personalDesc": "适合个人使用，界面更聚焦备份、检索和时间线。",
+      "family": "家庭模式",
+      "familyDesc": "适合家庭成员共享，保留后续多用户扩展空间。"
+    },
+    "finish": {
+      "title": "完成初始化",
+      "desc": "确认配置并写入初始化状态。",
+      "database": "数据库",
+      "admin": "管理员",
+      "usageMode": "使用模式"
+    },
+    "actions": {
+      "prev": "上一步",
+      "next": "下一步",
+      "finish": "完成初始化",
+      "login": "前往登录"
+    },
+    "validation": {
+      "userNameRequired": "请输入管理员用户名",
+      "passwordRequired": "请输入密码",
+      "passwordLength": "密码至少 8 个字符",
+      "confirmPasswordRequired": "请确认密码",
+      "passwordMismatch": "两次输入的密码不一致"
+    },
+    "message": {
+      "success": "系统初始化成功，即将跳转登录页"
+    }
+  },
+  "dashboardPage": {
+    "console": {
+      "title": "MsgLayer 归档概览",
+      "subtitle": "查看导入、事件、身份和最近活动。",
+      "openImports": "打开导入",
+      "recentImports": "最近导入",
+      "recentEvents": "最近事件",
+      "viewTimeline": "查看时间线",
+      "emptyEvents": "暂无最近事件",
+      "itemCount": "{count} 项",
+      "cards": {
+        "imports": "导入",
+        "events": "事件",
+        "identities": "身份",
+        "lastActivity": "最近活动"
+      },
+      "hints": {
+        "imports": "已验证的 MsgLayer 数据包",
+        "events": "已索引的时间线记录",
+        "identities": "已发现的联系人和设备",
+        "lastActivity": "最近事件时间戳"
+      },
+      "noImports": "暂无导入"
+    },
+    "timeline": {
+      "searchPlaceholder": "搜索时间线文本",
+      "typePlaceholder": "事件类型",
+      "apply": "应用",
+      "eventTypes": {
+        "all": "全部",
+        "sms": "短信",
+        "call": "通话",
+        "voice": "语音",
+        "contact_snapshot": "联系人快照"
+      }
+    },
+    "search": {
+      "placeholder": "搜索短信、转写或摘要",
+      "title": "搜索结果",
+      "matches": "{count} 条匹配"
+    },
+    "contacts": {
+      "title": "联系人",
+      "filterPlaceholder": "筛选联系人",
+      "loadActivity": "加载活动",
+      "phones": "电话",
+      "emails": "邮箱",
+      "source": "来源",
+      "empty": "选择一个联系人，查看其 MsgLayer 身份和最近活动。"
+    },
+    "imports": {
+      "chooseFile": "选择 MsgLayer 文件",
+      "noFile": "未选择文件",
+      "validate": "校验",
+      "import": "导入",
+      "history": "导入历史",
+      "count": "{count} 次导入",
+      "validationPassed": "校验通过。",
+      "validationFailed": "校验失败。",
+      "imported": "已导入 {id}（{version}）。",
+      "export": "导出"
+    },
+    "columns": {
+      "import": "导入",
+      "version": "版本",
+      "events": "事件",
+      "identities": "身份",
+      "importedAt": "导入时间",
+      "timestamp": "时间戳",
+      "type": "类型",
+      "direction": "方向",
+      "summary": "摘要",
+      "participants": "参与者",
+      "source": "来源",
+      "action": "操作"
+    }
+  },
+  "resultPage": {
+    "success": {
+      "title": "操作成功",
+      "message": "任务已完成，相关结果已写入 Commory。",
+      "content": "你可以继续查看结果，或返回上一步调整配置。"
+    },
+    "fail": {
+      "title": "操作失败",
+      "message": "请核对以下信息后重试。",
+      "intro": "当前操作未完成：",
+      "accountFrozen": "当前账户状态不可用",
+      "notEligible": "当前角色缺少所需权限"
+    },
+    "actions": {
+      "backEdit": "返回修改",
+      "view": "查看",
+      "print": "打印"
+    }
+  },
+  "systemPage": {
+    "user": {
+      "add": "新增用户",
+      "logoutTitle": "注销用户",
+      "logoutConfirm": "确定要注销该用户吗？",
+      "logoutSuccess": "注销成功",
+      "columns": {
+        "index": "序号",
+        "userName": "用户名",
+        "gender": "性别",
+        "phone": "手机号",
+        "status": "状态",
+        "createTime": "创建日期",
+        "operation": "操作"
+      },
+      "status": {
+        "online": "在线",
+        "offline": "离线",
+        "abnormal": "异常",
+        "cancelled": "注销",
+        "unknown": "未知"
+      },
+      "search": {
+        "userName": "用户名",
+        "userNamePlaceholder": "请输入用户名",
+        "phone": "手机号",
+        "phonePlaceholder": "请输入手机号",
+        "email": "邮箱",
+        "emailPlaceholder": "请输入邮箱",
+        "status": "状态",
+        "statusPlaceholder": "请选择状态",
+        "gender": "性别"
+      },
+      "dialog": {
+        "addTitle": "添加用户",
+        "editTitle": "编辑用户",
+        "phoneInvalid": "请输入正确的手机号格式",
+        "addSuccess": "添加成功",
+        "updateSuccess": "更新成功",
+        "role": "角色"
+      }
+    },
+    "role": {
+      "add": "新增角色",
+      "deleteTitle": "删除确认",
+      "deleteConfirm": "确定删除角色“{name}”吗？此操作不可恢复！",
+      "deleteSuccess": "删除成功",
+      "deleteCancel": "已取消删除",
+      "columns": {
+        "id": "角色ID",
+        "name": "角色名称",
+        "code": "角色编码",
+        "description": "角色描述",
+        "status": "角色状态",
+        "menuPermission": "菜单权限",
+        "editRole": "编辑角色",
+        "deleteRole": "删除角色"
+      },
+      "search": {
+        "name": "角色名称",
+        "namePlaceholder": "请输入角色名称",
+        "code": "角色编码",
+        "codePlaceholder": "请输入角色编码",
+        "description": "角色描述",
+        "descriptionPlaceholder": "请输入角色描述",
+        "status": "角色状态",
+        "statusPlaceholder": "请选择状态",
+        "date": "创建日期",
+        "datePlaceholder": "请选择日期范围",
+        "startDate": "开始日期",
+        "endDate": "结束日期",
+        "rangeSeparator": "至",
+        "today": "今日",
+        "week": "最近一周",
+        "month": "最近一个月"
+      },
+      "dialog": {
+        "addTitle": "新增角色",
+        "editTitle": "编辑角色",
+        "enabled": "启用",
+        "addSuccess": "新增成功",
+        "editSuccess": "修改成功"
+      },
+      "permission": {
+        "title": "菜单权限",
+        "output": "获取选中数据",
+        "collapse": "全部收起",
+        "expand": "全部展开",
+        "selectAll": "全部选择",
+        "unselectAll": "取消全选",
+        "save": "保存",
+        "saveSuccess": "权限保存成功",
+        "outputSuccess": "已输出选中数据到控制台，共选中 {count} 个节点"
+      }
+    },
+    "menu": {
+      "add": "添加菜单",
+      "collapse": "收起",
+      "expand": "展开",
+      "filters": {
+        "name": "菜单名称",
+        "route": "路由地址"
+      },
+      "columns": {
+        "name": "菜单名称",
+        "type": "菜单类型",
+        "route": "路由",
+        "auth": "权限标识",
+        "editTime": "编辑时间",
+        "status": "状态",
+        "operation": "操作"
+      },
+      "type": {
+        "button": "按钮",
+        "directory": "目录",
+        "iframe": "内嵌",
+        "menu": "菜单",
+        "external": "外链",
+        "unknown": "未知"
+      },
+      "authCount": "{count} 个权限标识",
+      "addAuth": "新增权限",
+      "deleteMenuConfirm": "确定要删除该菜单吗？删除后无法恢复",
+      "deleteAuthConfirm": "确定要删除该权限吗？删除后无法恢复",
+      "deleteSuccess": "删除成功",
+      "deleteFailed": "删除失败",
+      "dialog": {
+        "menu": "菜单",
+        "button": "按钮",
+        "newMenu": "新建菜单",
+        "editMenu": "编辑菜单",
+        "newButton": "新建按钮",
+        "editButton": "编辑按钮",
+        "menuType": "菜单类型",
+        "name": "菜单名称",
+        "namePlaceholder": "菜单名称",
+        "path": "路由地址",
+        "pathTip": "一级菜单：以 / 开头的绝对路径（如 /dashboard）\n二级及以下：相对路径（如 console、user）",
+        "pathPlaceholder": "如：/dashboard 或 console",
+        "label": "权限标识",
+        "labelPlaceholder": "如：User",
+        "component": "组件路径",
+        "componentTip": "一级父级菜单：填写 /index/index\n具体页面：填写组件路径（如 /system/user）\n目录菜单：留空",
+        "componentPlaceholder": "如：/system/user 或留空",
+        "icon": "图标",
+        "iconPlaceholder": "如：ri:user-line",
+        "roles": "角色权限",
+        "rolesTip": "仅用于前端权限模式：配置角色标识（如 R_SUPER、R_ADMIN）\n后端权限模式：无需配置",
+        "rolesPlaceholder": "输入角色标识后按回车，如：R_SUPER",
+        "sort": "菜单排序",
+        "link": "外部链接",
+        "linkPlaceholder": "如：https://www.example.com",
+        "badge": "文本徽章",
+        "badgePlaceholder": "如：New、Hot",
+        "activePath": "激活路径",
+        "activePathTip": "用于详情页等隐藏菜单，指定高亮显示的父级菜单路径\n例如：用户详情页高亮显示“用户管理”菜单",
+        "activePathPlaceholder": "如：/system/user",
+        "isEnable": "是否启用",
+        "keepAlive": "页面缓存",
+        "isHide": "隐藏菜单",
+        "isIframe": "是否内嵌",
+        "showBadge": "显示徽章",
+        "fixedTab": "固定标签",
+        "isHideTab": "标签隐藏",
+        "isFullPage": "全屏页面",
+        "authName": "权限名称",
+        "authNamePlaceholder": "如：新增、编辑、删除",
+        "authLabel": "权限标识",
+        "authLabelPlaceholder": "如：add、edit、delete",
+        "authSort": "权限排序",
+        "submitSuccess": "{action}成功",
+        "validateFailed": "表单校验失败，请检查输入"
+      }
+    }
+  },
+  "userCenter": {
+    "profile": "用户资料",
+    "tagline": "专注于本地优先的通信记忆管理",
+    "role": "Commory 管理员",
+    "location": "本地部署",
+    "team": "Commory 工作区",
+    "tags": "标签",
+    "tagList": ["本地优先", "通信归档", "隐私保护", "MsgLayer", "可检索", "可导出"],
+    "basicSettings": "基本设置",
+    "changePassword": "更改密码",
+    "realName": "姓名",
+    "gender": "性别",
+    "nickname": "昵称",
+    "email": "邮箱",
+    "mobile": "手机",
+    "address": "地址",
+    "bio": "个人介绍",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "male": "男",
+    "female": "女",
+    "edit": "编辑",
+    "save": "保存",
+    "validation": {
+      "realName": "请输入姓名",
+      "nickname": "请输入昵称",
+      "length": "长度在 2 到 50 个字符",
+      "email": "请输入邮箱",
+      "mobile": "请输入手机号码",
+      "address": "请输入地址",
+      "gender": "请选择性别"
+    },
+    "greetings": {
+      "early": "很晚了，早点休息",
+      "morning": "早上好",
+      "lateMorning": "上午好",
+      "noon": "中午好",
+      "afternoon": "下午好",
+      "evening": "晚上好"
+    }
+  },
+  "permission": {
+    "frontendMode": "前端权限模式",
+    "rolesHint": "路由 roles 控制页面访问，用户 buttons 控制按钮显示。",
+    "authHint": "v-auth 仅用于后端菜单 authList；当前前端模式请优先使用 hasAuth。"
   }
 }

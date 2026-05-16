@@ -11,6 +11,10 @@
 </template>
 
 <script setup lang="ts">
+  import { useI18n } from 'vue-i18n'
+
+  const { t } = useI18n()
+
   type RoleSearchFormParams = Api.SystemManage.RoleSearchParams & {
     daterange?: string[]
   }
@@ -47,8 +51,8 @@
    * 角色状态选项
    */
   const statusOptions = ref([
-    { label: '启用', value: true },
-    { label: '禁用', value: false }
+    { label: t('common.enabled'), value: true },
+    { label: t('common.disabled'), value: false }
   ])
 
   /**
@@ -56,52 +60,58 @@
    */
   const formItems = computed(() => [
     {
-      label: '角色名称',
+      label: t('systemPage.role.search.name'),
       key: 'roleName',
       type: 'input',
-      placeholder: '请输入角色名称',
+      placeholder: t('systemPage.role.search.namePlaceholder'),
       clearable: true
     },
     {
-      label: '角色编码',
+      label: t('systemPage.role.search.code'),
       key: 'roleCode',
       type: 'input',
-      placeholder: '请输入角色编码',
+      placeholder: t('systemPage.role.search.codePlaceholder'),
       clearable: true
     },
     {
-      label: '角色描述',
+      label: t('systemPage.role.search.description'),
       key: 'description',
       type: 'input',
-      placeholder: '请输入角色描述',
+      placeholder: t('systemPage.role.search.descriptionPlaceholder'),
       clearable: true
     },
     {
-      label: '角色状态',
+      label: t('systemPage.role.search.status'),
       key: 'enabled',
       type: 'select',
       props: {
-        placeholder: '请选择状态',
+        placeholder: t('systemPage.role.search.statusPlaceholder'),
         options: statusOptions.value,
         clearable: true
       }
     },
     {
-      label: '创建日期',
+      label: t('systemPage.role.search.date'),
       key: 'daterange',
       type: 'datetime',
       props: {
         style: { width: '100%' },
-        placeholder: '请选择日期范围',
+        placeholder: t('systemPage.role.search.datePlaceholder'),
         type: 'daterange',
-        rangeSeparator: '至',
-        startPlaceholder: '开始日期',
-        endPlaceholder: '结束日期',
+        rangeSeparator: t('systemPage.role.search.rangeSeparator'),
+        startPlaceholder: t('systemPage.role.search.startDate'),
+        endPlaceholder: t('systemPage.role.search.endDate'),
         valueFormat: 'YYYY-MM-DD',
         shortcuts: [
-          { text: '今日', value: [new Date(), new Date()] },
-          { text: '最近一周', value: [new Date(Date.now() - 604800000), new Date()] },
-          { text: '最近一个月', value: [new Date(Date.now() - 2592000000), new Date()] }
+          { text: t('systemPage.role.search.today'), value: [new Date(), new Date()] },
+          {
+            text: t('systemPage.role.search.week'),
+            value: [new Date(Date.now() - 604800000), new Date()]
+          },
+          {
+            text: t('systemPage.role.search.month'),
+            value: [new Date(Date.now() - 2592000000), new Date()]
+          }
         ]
       }
     }

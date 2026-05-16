@@ -1,11 +1,15 @@
 <template>
   <div class="contacts-layout">
-    <section class="list-panel">
+    <ElCard class="list-panel" shadow="never">
       <div class="panel-header">
-        <h3>Contacts</h3>
+        <h3>{{ t('dashboardPage.contacts.title') }}</h3>
         <span>{{ contacts.length }}</span>
       </div>
-      <ElInput v-model="keyword" placeholder="Filter contacts" clearable />
+      <ElInput
+        v-model="keyword"
+        :placeholder="t('dashboardPage.contacts.filterPlaceholder')"
+        clearable
+      />
       <div class="contact-list">
         <button
           v-for="item in filteredContacts"
@@ -18,26 +22,30 @@
           <span>{{ item.phones[0] || item.emails[0] || item.id }}</span>
         </button>
       </div>
-    </section>
+    </ElCard>
 
-    <section class="detail-panel">
+    <ElCard class="detail-panel" shadow="never">
       <template v-if="selected">
         <div class="panel-header">
           <div>
             <h3>{{ selected.display_name }}</h3>
             <p class="detail-meta">{{ selected.type }} · {{ selected.labels.join(', ') }}</p>
           </div>
-          <ElButton link type="primary" @click="loadTimeline">Load Activity</ElButton>
+          <ElButton link type="primary" @click="loadTimeline">
+            {{ t('dashboardPage.contacts.loadActivity') }}
+          </ElButton>
         </div>
 
         <ElDescriptions :column="1" border>
-          <ElDescriptionsItem label="Phones">{{
+          <ElDescriptionsItem :label="t('dashboardPage.contacts.phones')">{{
             selected.phones.join(', ') || '-'
           }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="Emails">{{
+          <ElDescriptionsItem :label="t('dashboardPage.contacts.emails')">{{
             selected.emails.join(', ') || '-'
           }}</ElDescriptionsItem>
-          <ElDescriptionsItem label="Source">{{ selected.meta?.source || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('dashboardPage.contacts.source')">{{
+            selected.meta?.source || '-'
+          }}</ElDescriptionsItem>
         </ElDescriptions>
 
         <div class="activity-list">
@@ -50,18 +58,18 @@
           </div>
         </div>
       </template>
-      <div v-else class="empty-state"
-        >Select a contact to inspect its MsgLayer identity and recent activity.</div
-      >
-    </section>
+      <ElEmpty v-else class="empty-state" :description="t('dashboardPage.contacts.empty')" />
+    </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
   import { fetchIdentities, fetchTimeline } from '@/api/commory'
+  import { useI18n } from 'vue-i18n'
 
   defineOptions({ name: 'Contacts' })
 
+  const { t } = useI18n()
   const contacts = ref<Api.Commory.Identity[]>([])
   const selected = ref<Api.Commory.Identity>()
   const events = ref<Api.Commory.TimelineItem[]>([])
@@ -106,9 +114,12 @@
 
   .list-panel,
   .detail-panel {
-    background: var(--art-main-bg-color);
     border: 1px solid var(--art-border-color);
     border-radius: 8px;
+  }
+
+  .list-panel :deep(.el-card__body),
+  .detail-panel :deep(.el-card__body) {
     padding: 18px;
   }
 

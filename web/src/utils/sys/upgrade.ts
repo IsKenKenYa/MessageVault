@@ -38,6 +38,7 @@ import { upgradeLogList } from '@/mock/upgrade/changeLog'
 import { ElNotification } from 'element-plus'
 import { useUserStore } from '@/store/modules/user'
 import { StorageConfig } from '@/utils/storage/storage-config'
+import { $t } from '@/locales'
 
 /**
  * 版本管理器
@@ -134,14 +135,14 @@ class VersionManager {
 
     const messageParts = [
       `<p style="color: var(--art-gray-800) !important; padding-bottom: 5px;">`,
-      `系统已升级到 ${StorageConfig.CURRENT_VERSION} 版本，此次更新带来了以下改进：`,
+      `${$t('common.systemUpgradedPrefix')} ${StorageConfig.CURRENT_VERSION} ${$t('common.systemUpgradedSuffix')}`,
       `</p>`,
       content
     ]
 
     if (requireReLogin) {
       messageParts.push(
-        `<p style="color: var(--theme-color); padding-top: 5px;">升级完成，请重新登录后继续使用。</p>`
+        `<p style="color: var(--theme-color); padding-top: 5px;">${$t('common.upgradeReLogin')}</p>`
       )
     }
 

@@ -1,24 +1,43 @@
 <template>
   <div class="page-grid">
     <section class="toolbar">
-      <ElInput v-model="filters.q" placeholder="Search timeline text" clearable />
-      <ElSelect v-model="filters.type" clearable placeholder="Event type">
-        <ElOption label="All" value="" />
-        <ElOption label="SMS" value="sms" />
-        <ElOption label="Call" value="call" />
-        <ElOption label="Voice" value="voice" />
-        <ElOption label="Contact Snapshot" value="contact_snapshot" />
+      <ElInput
+        v-model="filters.q"
+        :placeholder="t('dashboardPage.timeline.searchPlaceholder')"
+        clearable
+      />
+      <ElSelect
+        v-model="filters.type"
+        clearable
+        :placeholder="t('dashboardPage.timeline.typePlaceholder')"
+      >
+        <ElOption :label="t('dashboardPage.timeline.eventTypes.all')" value="" />
+        <ElOption :label="t('dashboardPage.timeline.eventTypes.sms')" value="sms" />
+        <ElOption :label="t('dashboardPage.timeline.eventTypes.call')" value="call" />
+        <ElOption :label="t('dashboardPage.timeline.eventTypes.voice')" value="voice" />
+        <ElOption
+          :label="t('dashboardPage.timeline.eventTypes.contact_snapshot')"
+          value="contact_snapshot"
+        />
       </ElSelect>
-      <ElButton type="primary" @click="load">Apply</ElButton>
+      <ElButton type="primary" @click="load">{{ t('dashboardPage.timeline.apply') }}</ElButton>
     </section>
 
-    <section class="panel">
+    <ElCard class="panel art-table-card" shadow="never">
       <ElTable :data="items" size="large" v-loading="loading">
-        <ElTableColumn prop="timestamp" label="Timestamp" min-width="190" />
-        <ElTableColumn prop="type" label="Type" width="130" />
-        <ElTableColumn prop="direction" label="Direction" width="120" />
-        <ElTableColumn prop="content_summary" label="Summary" min-width="320" />
-        <ElTableColumn label="Participants" min-width="240">
+        <ElTableColumn
+          prop="timestamp"
+          :label="t('dashboardPage.columns.timestamp')"
+          min-width="190"
+        />
+        <ElTableColumn prop="type" :label="t('dashboardPage.columns.type')" width="130" />
+        <ElTableColumn prop="direction" :label="t('dashboardPage.columns.direction')" width="120" />
+        <ElTableColumn
+          prop="content_summary"
+          :label="t('dashboardPage.columns.summary')"
+          min-width="320"
+        />
+        <ElTableColumn :label="t('dashboardPage.columns.participants')" min-width="240">
           <template #default="{ row }">{{ row.participants.join(', ') }}</template>
         </ElTableColumn>
       </ElTable>
@@ -31,15 +50,17 @@
           @current-change="handlePageChange"
         />
       </div>
-    </section>
+    </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
   import { fetchTimeline } from '@/api/commory'
+  import { useI18n } from 'vue-i18n'
 
   defineOptions({ name: 'Timeline' })
 
+  const { t } = useI18n()
   const loading = ref(false)
   const items = ref<Api.Commory.TimelineItem[]>([])
   const currentPage = ref(1)
@@ -81,8 +102,7 @@
     gap: 16px;
   }
 
-  .toolbar,
-  .panel {
+  .toolbar {
     background: var(--art-main-bg-color);
     border: 1px solid var(--art-border-color);
     border-radius: 8px;
@@ -93,10 +113,6 @@
     grid-template-columns: minmax(0, 1.4fr) 180px 120px;
     gap: 12px;
     padding: 16px;
-  }
-
-  .panel {
-    padding: 18px;
   }
 
   .pagination-wrapper {

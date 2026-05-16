@@ -1,0 +1,16 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema: "../migrations/sqlite"
+    queries: "query"
+    gen:
+      go:
+        package: "sqlcgen"
+        out: "gen"
+        emit_json_tags: true
+        emit_empty_slices: true
+        emit_result_struct_pointers: true
+        emit_params_struct_pointers: true
+        overrides:
+          - db_type: "DATETIME"
+            go_type: "time.Time"

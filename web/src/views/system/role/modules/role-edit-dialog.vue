@@ -1,39 +1,52 @@
 <template>
   <ElDialog
     v-model="visible"
-    :title="dialogType === 'add' ? '新增角色' : '编辑角色'"
+    :title="
+      dialogType === 'add'
+        ? t('systemPage.role.dialog.addTitle')
+        : t('systemPage.role.dialog.editTitle')
+    "
     width="30%"
     align-center
     @close="handleClose"
   >
     <ElForm ref="formRef" :model="form" :rules="rules" label-width="120px">
-      <ElFormItem label="角色名称" prop="roleName">
-        <ElInput v-model="form.roleName" placeholder="请输入角色名称" />
+      <ElFormItem :label="t('systemPage.role.search.name')" prop="roleName">
+        <ElInput
+          v-model="form.roleName"
+          :placeholder="t('systemPage.role.search.namePlaceholder')"
+        />
       </ElFormItem>
-      <ElFormItem label="角色编码" prop="roleCode">
-        <ElInput v-model="form.roleCode" placeholder="请输入角色编码" />
+      <ElFormItem :label="t('systemPage.role.search.code')" prop="roleCode">
+        <ElInput
+          v-model="form.roleCode"
+          :placeholder="t('systemPage.role.search.codePlaceholder')"
+        />
       </ElFormItem>
-      <ElFormItem label="描述" prop="description">
+      <ElFormItem :label="t('systemPage.role.search.description')" prop="description">
         <ElInput
           v-model="form.description"
           type="textarea"
           :rows="3"
-          placeholder="请输入角色描述"
+          :placeholder="t('systemPage.role.search.descriptionPlaceholder')"
         />
       </ElFormItem>
-      <ElFormItem label="启用">
+      <ElFormItem :label="t('systemPage.role.dialog.enabled')">
         <ElSwitch v-model="form.enabled" />
       </ElFormItem>
     </ElForm>
     <template #footer>
-      <ElButton @click="handleClose">取消</ElButton>
-      <ElButton type="primary" @click="handleSubmit">提交</ElButton>
+      <ElButton @click="handleClose">{{ t('common.cancel') }}</ElButton>
+      <ElButton type="primary" @click="handleSubmit">{{ t('common.submit') }}</ElButton>
     </template>
   </ElDialog>
 </template>
 
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
+
+  const { t } = useI18n()
 
   type RoleListItem = Api.SystemManage.RoleListItem
 
@@ -71,14 +84,20 @@
    */
   const rules = reactive<FormRules>({
     roleName: [
-      { required: true, message: '请输入角色名称', trigger: 'blur' },
-      { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
+      { required: true, message: t('systemPage.role.search.namePlaceholder'), trigger: 'blur' },
+      { min: 2, max: 20, message: t('userCenter.validation.length'), trigger: 'blur' }
     ],
     roleCode: [
-      { required: true, message: '请输入角色编码', trigger: 'blur' },
-      { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+      { required: true, message: t('systemPage.role.search.codePlaceholder'), trigger: 'blur' },
+      { min: 2, max: 50, message: t('userCenter.validation.length'), trigger: 'blur' }
     ],
-    description: [{ required: true, message: '请输入角色描述', trigger: 'blur' }]
+    description: [
+      {
+        required: true,
+        message: t('systemPage.role.search.descriptionPlaceholder'),
+        trigger: 'blur'
+      }
+    ]
   })
 
   /**
@@ -151,7 +170,10 @@
     try {
       await formRef.value.validate()
       // TODO: 调用新增/编辑接口
-      const message = props.dialogType === 'add' ? '新增成功' : '修改成功'
+      const message =
+        props.dialogType === 'add'
+          ? t('systemPage.role.dialog.addSuccess')
+          : t('systemPage.role.dialog.editSuccess')
       ElMessage.success(message)
       emit('success')
       handleClose()

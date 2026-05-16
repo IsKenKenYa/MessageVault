@@ -45,17 +45,26 @@ export const setPageTitle = (to: RouteLocationNormalized): void => {
  * @returns 格式化后的菜单标题
  */
 export const formatMenuTitle = (title: string): string => {
-  if (title) {
-    if (title.startsWith('menus.')) {
-      // 使用 te() 方法检查翻译键值是否存在，避免控制台警告
-      if (i18n.global.te(title)) {
-        return $t(title)
-      } else {
-        // 如果翻译不存在，返回键值的最后部分作为fallback
-        return title.split('.').pop() || title
-      }
-    }
-    return title
+  if (!title) {
+    return ''
   }
-  return ''
+
+  if (i18n.global.te(title)) {
+    return $t(title)
+  }
+
+  const looksLikeI18nKey = /^[a-z][\w-]*(\.[\w-]+)+(\[\d+\])?$/i.test(title)
+  if (looksLikeI18nKey) {
+    if (import.meta.env.DEV) {
+      console.warn(`[i18n] missing translation key: ${title}`)
+    }
+    return (
+      title
+        .split('.')
+        .pop()
+        ?.replace(/\[\d+\]$/, '') || title
+    )
+  }
+
+  return title
 }

@@ -1,7 +1,7 @@
 <template>
   <ElDialog
     v-model="visible"
-    title="菜单权限"
+    :title="t('systemPage.role.permission.title')"
     width="520px"
     align-center
     class="el-dialog-border"
@@ -29,13 +29,23 @@
       </ElTree>
     </ElScrollbar>
     <template #footer>
-      <ElButton @click="outputSelectedData" style="margin-left: 8px">获取选中数据</ElButton>
+      <ElButton @click="outputSelectedData" style="margin-left: 8px">
+        {{ t('systemPage.role.permission.output') }}
+      </ElButton>
 
-      <ElButton @click="toggleExpandAll">{{ isExpandAll ? '全部收起' : '全部展开' }}</ElButton>
-      <ElButton @click="toggleSelectAll" style="margin-left: 8px">{{
-        isSelectAll ? '取消全选' : '全部选择'
+      <ElButton @click="toggleExpandAll">{{
+        isExpandAll
+          ? t('systemPage.role.permission.collapse')
+          : t('systemPage.role.permission.expand')
       }}</ElButton>
-      <ElButton type="primary" @click="savePermission">保存</ElButton>
+      <ElButton @click="toggleSelectAll" style="margin-left: 8px">{{
+        isSelectAll
+          ? t('systemPage.role.permission.unselectAll')
+          : t('systemPage.role.permission.selectAll')
+      }}</ElButton>
+      <ElButton type="primary" @click="savePermission">
+        {{ t('systemPage.role.permission.save') }}
+      </ElButton>
     </template>
   </ElDialog>
 </template>
@@ -43,8 +53,10 @@
 <script setup lang="ts">
   import { useMenuStore } from '@/store/modules/menu'
   import { formatMenuTitle } from '@/utils/router'
+  import { useI18n } from 'vue-i18n'
 
   type RoleListItem = Api.SystemManage.RoleListItem
+  const { t } = useI18n()
 
   interface Props {
     modelValue: boolean
@@ -162,7 +174,7 @@
    */
   const savePermission = () => {
     // TODO: 调用保存权限接口
-    ElMessage.success('权限保存成功')
+    ElMessage.success(t('systemPage.role.permission.saveSuccess'))
     emit('success')
     handleClose()
   }
@@ -249,6 +261,8 @@
     }
 
     console.log('=== 选中的权限数据 ===', selectedData)
-    ElMessage.success(`已输出选中数据到控制台，共选中 ${selectedData.totalChecked} 个节点`)
+    ElMessage.success(
+      t('systemPage.role.permission.outputSuccess', { count: selectedData.totalChecked })
+    )
   }
 </script>

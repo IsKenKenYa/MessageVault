@@ -28,7 +28,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		Driver:           env("COMMORY_DB_DRIVER", "sqlite"),
-		DSN:              env("COMMORY_DB_DSN", filepath.Join(".", "data", "commory-store.json")),
+		DSN:              env("COMMORY_DB_DSN", filepath.Join(".", "data", "commory.db")),
 		DatabaseURL:      env("COMMORY_DATABASE_URL", ""),
 		ListenAddr:       env("COMMORY_LISTEN_ADDR", ":3000"),
 		SchemaRoot:       schemaRoot,

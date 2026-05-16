@@ -41,6 +41,7 @@
 
 import type { ApiResponse } from './tableCache'
 import { tableConfig } from './tableConfig'
+import { $t } from '@/locales'
 
 // 请求参数基础接口，扩展分页参数
 export interface BaseRequestParams extends Api.Common.PaginationParams {
@@ -279,7 +280,7 @@ export const createErrorHandler = (
   return (err: unknown, context: string): TableError => {
     const tableError: TableError = {
       code: 'UNKNOWN_ERROR',
-      message: '未知错误',
+      message: $t('common.unknownError'),
       details: err
     }
 

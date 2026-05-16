@@ -3,19 +3,20 @@
     <section class="toolbar">
       <ElInput
         v-model="query"
-        placeholder="Search SMS text, transcript, or summary"
+        :placeholder="t('dashboardPage.search.placeholder')"
         clearable
         @keyup.enter="load"
       />
-      <ElButton type="primary" @click="load">Search</ElButton>
+      <ElButton type="primary" @click="load">{{ t('common.search') }}</ElButton>
     </section>
 
-    <section class="panel">
+    <ElCard class="panel" shadow="never">
       <div class="panel-header">
-        <h3>Results</h3>
-        <span>{{ results.length }} matches</span>
+        <h3>{{ t('dashboardPage.search.title') }}</h3>
+        <span>{{ t('dashboardPage.search.matches', { count: results.length }) }}</span>
       </div>
-      <div class="result-list" v-loading="loading">
+      <ElEmpty v-if="!loading && !results.length" :description="t('common.noData')" />
+      <div v-else class="result-list" v-loading="loading">
         <article v-for="item in results" :key="item.event_id" class="result-item">
           <div class="result-top">
             <strong>{{ item.content_summary || item.type }}</strong>
@@ -34,15 +35,17 @@
           @current-change="handlePageChange"
         />
       </div>
-    </section>
+    </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
   import { fetchSearch } from '@/api/commory'
+  import { useI18n } from 'vue-i18n'
 
   defineOptions({ name: 'SearchRecords' })
 
+  const { t } = useI18n()
   const query = ref('')
   const loading = ref(false)
   const results = ref<Api.Commory.TimelineItem[]>([])
@@ -88,10 +91,6 @@
     grid-template-columns: minmax(0, 1fr) 120px;
     gap: 12px;
     padding: 16px;
-  }
-
-  .panel {
-    padding: 18px;
   }
 
   .panel-header,

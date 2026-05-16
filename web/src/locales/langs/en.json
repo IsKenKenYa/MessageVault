@@ -36,7 +36,35 @@
     "tips": "Prompt",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "logOutTips": "Do you want to log out?"
+    "logOutTips": "Do you want to log out?",
+    "save": "Save",
+    "edit": "Edit",
+    "add": "Add",
+    "delete": "Delete",
+    "view": "View",
+    "print": "Print",
+    "back": "Back",
+    "search": "Search",
+    "reset": "Reset",
+    "submit": "Submit",
+    "success": "Success",
+    "failed": "Failed",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "noData": "No data",
+    "all": "All",
+    "actions": "Actions",
+    "status": "Status",
+    "createTime": "Created At",
+    "unknown": "Unknown",
+    "unknownError": "Unknown error",
+    "storageError": "Local data looks invalid. Please log in again to restore the system.",
+    "systemUpgradedPrefix": "The system has been upgraded to",
+    "systemUpgradedSuffix": ". This update includes the following improvements:",
+    "upgradeReLogin": "Upgrade complete. Please log in again to continue.",
+    "invalidHexColor": "Invalid hex color value",
+    "invalidRgbColor": "Invalid RGB color value",
+    "selected": "{count} selected"
   },
   "search": {
     "placeholder": "Search page",
@@ -48,20 +76,11 @@
   "setting": {
     "menuType": {
       "title": "Menu Layout",
-      "list": [
-        "Vertical",
-        "Horizontal",
-        "Mixed",
-        "Dual"
-      ]
+      "list": ["Vertical", "Horizontal", "Mixed", "Dual"]
     },
     "theme": {
       "title": "Theme Style",
-      "list": [
-        "Light",
-        "Dark",
-        "System"
-      ]
+      "list": ["Light", "Dark", "System"]
     },
     "menu": {
       "title": "Menu Style"
@@ -71,17 +90,11 @@
     },
     "box": {
       "title": "Box Style",
-      "list": [
-        "Border",
-        "Shadow"
-      ]
+      "list": ["Border", "Shadow"]
     },
     "container": {
       "title": "Container Width",
-      "list": [
-        "Full",
-        "Boxed"
-      ]
+      "list": ["Full", "Boxed"]
     },
     "basics": {
       "title": "Basic Config",
@@ -127,14 +140,8 @@
   "notice": {
     "title": "Notice",
     "btnRead": "Mark as read",
-    "bar": [
-      "Notice",
-      "Message",
-      "Todo"
-    ],
-    "text": [
-      "No"
-    ],
+    "bar": ["Notice", "Message", "Todo"],
+    "text": ["No"],
     "viewAll": "View all"
   },
   "worktab": {
@@ -182,7 +189,8 @@
     "subTitle": "Enter your email to reset your password",
     "placeholder": "Please enter your email",
     "submitBtnText": "Submit",
-    "backBtnText": "Back"
+    "backBtnText": "Back",
+    "accountLabel": "Account"
   },
   "register": {
     "title": "Create account",
@@ -204,7 +212,10 @@
     "privacyPolicy": "Privacy policy",
     "submitBtnText": "Register",
     "hasAccount": "Already have an account?",
-    "toLogin": "To login"
+    "toLogin": "To login",
+    "success": {
+      "message": "Registration successful"
+    }
   },
   "lockScreen": {
     "pwdError": "Password error",
@@ -269,6 +280,9 @@
       "role": "Role Manage",
       "userCenter": "User Center",
       "menu": "Menu Manage"
+    },
+    "setup": {
+      "title": "System Setup"
     }
   },
   "table": {
@@ -298,5 +312,391 @@
     "zebra": "Zebra",
     "border": "Border",
     "headerBackground": "Header BG"
+  },
+  "setup": {
+    "brand": "Commory",
+    "title": "Initialize Commory",
+    "subtitle": "Complete the first-run setup for your local-first communication memory.",
+    "eyebrow": "Local-first · single-port deployment",
+    "panelTitle": "Setup Wizard",
+    "panelSubtitle": "Confirm storage, administrator credentials, and usage mode step by step.",
+    "loadingStatus": "Checking setup status...",
+    "apiUnavailable": "Setup API is temporarily unavailable. You can continue filling the form and submit later.",
+    "steps": {
+      "database": "Database",
+      "admin": "Administrator",
+      "mode": "Usage Mode",
+      "finish": "Finish"
+    },
+    "database": {
+      "title": "Database Check",
+      "desc": "Confirm current storage and connection status.",
+      "type": "SQLite Database",
+      "hint": "A lightweight file database for personal use and small deployments.",
+      "ready": "Storage is ready"
+    },
+    "admin": {
+      "title": "Administrator Account",
+      "desc": "Set the initial account used to manage Commory.",
+      "existsTitle": "Administrator already exists",
+      "existsDesc": "An administrator account already exists. You can continue to the next step.",
+      "userName": "Username",
+      "userNamePlaceholder": "Enter administrator username",
+      "password": "Password",
+      "passwordPlaceholder": "At least 8 characters",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Enter password again",
+      "existing": "Exists",
+      "notSet": "Not set"
+    },
+    "mode": {
+      "title": "Usage Mode",
+      "desc": "Choose the default experience after setup.",
+      "personal": "Personal Mode",
+      "personalDesc": "For personal use, focused on backup, search, and timeline.",
+      "family": "Family Mode",
+      "familyDesc": "For family sharing, preserving room for multi-user expansion."
+    },
+    "finish": {
+      "title": "Finish Setup",
+      "desc": "Confirm settings and write the initialization state.",
+      "database": "Database",
+      "admin": "Administrator",
+      "usageMode": "Usage Mode"
+    },
+    "actions": {
+      "prev": "Previous",
+      "next": "Next",
+      "finish": "Finish Setup",
+      "login": "Go to Login"
+    },
+    "validation": {
+      "userNameRequired": "Please enter administrator username",
+      "passwordRequired": "Please enter password",
+      "passwordLength": "Password must be at least 8 characters",
+      "confirmPasswordRequired": "Please confirm password",
+      "passwordMismatch": "Passwords do not match"
+    },
+    "message": {
+      "success": "Setup completed. Redirecting to login."
+    }
+  },
+  "dashboardPage": {
+    "console": {
+      "title": "MsgLayer Archive Overview",
+      "subtitle": "Review imports, events, identities, and recent archive activity.",
+      "openImports": "Open Imports",
+      "recentImports": "Recent Imports",
+      "recentEvents": "Recent Events",
+      "viewTimeline": "View Timeline",
+      "emptyEvents": "No recent events",
+      "itemCount": "{count} items",
+      "cards": {
+        "imports": "Imports",
+        "events": "Events",
+        "identities": "Identities",
+        "lastActivity": "Last Activity"
+      },
+      "hints": {
+        "imports": "Validated MsgLayer payloads",
+        "events": "Timeline records indexed",
+        "identities": "Contacts and devices discovered",
+        "lastActivity": "Most recent event timestamp"
+      },
+      "noImports": "No imports yet"
+    },
+    "timeline": {
+      "searchPlaceholder": "Search timeline text",
+      "typePlaceholder": "Event type",
+      "apply": "Apply",
+      "eventTypes": {
+        "all": "All",
+        "sms": "SMS",
+        "call": "Call",
+        "voice": "Voice",
+        "contact_snapshot": "Contact Snapshot"
+      }
+    },
+    "search": {
+      "placeholder": "Search SMS text, transcript, or summary",
+      "title": "Results",
+      "matches": "{count} matches"
+    },
+    "contacts": {
+      "title": "Contacts",
+      "filterPlaceholder": "Filter contacts",
+      "loadActivity": "Load Activity",
+      "phones": "Phones",
+      "emails": "Emails",
+      "source": "Source",
+      "empty": "Select a contact to inspect its MsgLayer identity and recent activity."
+    },
+    "imports": {
+      "chooseFile": "Choose MsgLayer File",
+      "noFile": "No file selected",
+      "validate": "Validate",
+      "import": "Import",
+      "history": "Import History",
+      "count": "{count} imports",
+      "validationPassed": "Validation passed.",
+      "validationFailed": "Validation failed.",
+      "imported": "Imported {id} ({version}).",
+      "export": "Export"
+    },
+    "columns": {
+      "import": "Import",
+      "version": "Version",
+      "events": "Events",
+      "identities": "Identities",
+      "importedAt": "Imported At",
+      "timestamp": "Timestamp",
+      "type": "Type",
+      "direction": "Direction",
+      "summary": "Summary",
+      "participants": "Participants",
+      "source": "Source",
+      "action": "Action"
+    }
+  },
+  "resultPage": {
+    "success": {
+      "title": "Operation Successful",
+      "message": "The task is complete and the result has been written to Commory.",
+      "content": "You can review the result or return to adjust the configuration."
+    },
+    "fail": {
+      "title": "Operation Failed",
+      "message": "Check the following information and try again.",
+      "intro": "The operation was not completed:",
+      "accountFrozen": "Current account status is unavailable",
+      "notEligible": "Current role does not have the required permission"
+    },
+    "actions": {
+      "backEdit": "Back to Edit",
+      "view": "View",
+      "print": "Print"
+    }
+  },
+  "systemPage": {
+    "user": {
+      "add": "Add User",
+      "logoutTitle": "Disable User",
+      "logoutConfirm": "Are you sure you want to disable this user?",
+      "logoutSuccess": "User disabled",
+      "columns": {
+        "index": "Index",
+        "userName": "Username",
+        "gender": "Gender",
+        "phone": "Phone",
+        "status": "Status",
+        "createTime": "Created At",
+        "operation": "Actions"
+      },
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "abnormal": "Abnormal",
+        "cancelled": "Disabled",
+        "unknown": "Unknown"
+      },
+      "search": {
+        "userName": "Username",
+        "userNamePlaceholder": "Enter username",
+        "phone": "Phone",
+        "phonePlaceholder": "Enter phone number",
+        "email": "Email",
+        "emailPlaceholder": "Enter email",
+        "status": "Status",
+        "statusPlaceholder": "Select status",
+        "gender": "Gender"
+      },
+      "dialog": {
+        "addTitle": "Add User",
+        "editTitle": "Edit User",
+        "phoneInvalid": "Please enter a valid phone number",
+        "addSuccess": "Added successfully",
+        "updateSuccess": "Updated successfully",
+        "role": "Role"
+      }
+    },
+    "role": {
+      "add": "Add Role",
+      "deleteTitle": "Delete Confirmation",
+      "deleteConfirm": "Delete role “{name}”? This action cannot be undone.",
+      "deleteSuccess": "Deleted successfully",
+      "deleteCancel": "Delete cancelled",
+      "columns": {
+        "id": "Role ID",
+        "name": "Role Name",
+        "code": "Role Code",
+        "description": "Description",
+        "status": "Role Status",
+        "menuPermission": "Menu Permission",
+        "editRole": "Edit Role",
+        "deleteRole": "Delete Role"
+      },
+      "search": {
+        "name": "Role Name",
+        "namePlaceholder": "Enter role name",
+        "code": "Role Code",
+        "codePlaceholder": "Enter role code",
+        "description": "Description",
+        "descriptionPlaceholder": "Enter role description",
+        "status": "Role Status",
+        "statusPlaceholder": "Select status",
+        "date": "Created At",
+        "datePlaceholder": "Select date range",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "rangeSeparator": "to",
+        "today": "Today",
+        "week": "Last 7 days",
+        "month": "Last 30 days"
+      },
+      "dialog": {
+        "addTitle": "Add Role",
+        "editTitle": "Edit Role",
+        "enabled": "Enabled",
+        "addSuccess": "Added successfully",
+        "editSuccess": "Updated successfully"
+      },
+      "permission": {
+        "title": "Menu Permission",
+        "output": "Output Selection",
+        "collapse": "Collapse All",
+        "expand": "Expand All",
+        "selectAll": "Select All",
+        "unselectAll": "Unselect All",
+        "save": "Save",
+        "saveSuccess": "Permissions saved",
+        "outputSuccess": "Selection output to console. {count} nodes selected."
+      }
+    },
+    "menu": {
+      "add": "Add Menu",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "filters": {
+        "name": "Menu Name",
+        "route": "Route Path"
+      },
+      "columns": {
+        "name": "Menu Name",
+        "type": "Menu Type",
+        "route": "Route",
+        "auth": "Permission Code",
+        "editTime": "Edited At",
+        "status": "Status",
+        "operation": "Actions"
+      },
+      "type": {
+        "button": "Button",
+        "directory": "Directory",
+        "iframe": "Iframe",
+        "menu": "Menu",
+        "external": "External",
+        "unknown": "Unknown"
+      },
+      "authCount": "{count} permission codes",
+      "addAuth": "Add Permission",
+      "deleteMenuConfirm": "Delete this menu? This action cannot be undone.",
+      "deleteAuthConfirm": "Delete this permission? This action cannot be undone.",
+      "deleteSuccess": "Deleted successfully",
+      "deleteFailed": "Delete failed",
+      "dialog": {
+        "menu": "Menu",
+        "button": "Button",
+        "newMenu": "New Menu",
+        "editMenu": "Edit Menu",
+        "newButton": "New Button",
+        "editButton": "Edit Button",
+        "menuType": "Menu Type",
+        "name": "Menu Name",
+        "namePlaceholder": "Menu name",
+        "path": "Route Path",
+        "pathTip": "Top-level menus use an absolute path starting with /, such as /dashboard. Nested menus use relative paths such as console or user.",
+        "pathPlaceholder": "e.g. /dashboard or console",
+        "label": "Permission Code",
+        "labelPlaceholder": "e.g. User",
+        "component": "Component Path",
+        "componentTip": "Top-level parent menu: /index/index. Page component: /system/user. Directory menu: leave empty.",
+        "componentPlaceholder": "e.g. /system/user or empty",
+        "icon": "Icon",
+        "iconPlaceholder": "e.g. ri:user-line",
+        "roles": "Role Access",
+        "rolesTip": "Frontend mode only: configure role codes such as R_SUPER or R_ADMIN. Backend mode does not require this.",
+        "rolesPlaceholder": "Enter role code and press Enter, e.g. R_SUPER",
+        "sort": "Menu Sort",
+        "link": "External Link",
+        "linkPlaceholder": "e.g. https://www.example.com",
+        "badge": "Text Badge",
+        "badgePlaceholder": "e.g. New or Hot",
+        "activePath": "Active Path",
+        "activePathTip": "Used by hidden detail pages to highlight a parent menu, such as highlighting User Management on a user detail page.",
+        "activePathPlaceholder": "e.g. /system/user",
+        "isEnable": "Enabled",
+        "keepAlive": "Keep Alive",
+        "isHide": "Hide Menu",
+        "isIframe": "Iframe",
+        "showBadge": "Show Badge",
+        "fixedTab": "Fixed Tab",
+        "isHideTab": "Hide Tab",
+        "isFullPage": "Full Page",
+        "authName": "Permission Name",
+        "authNamePlaceholder": "e.g. Add, Edit, Delete",
+        "authLabel": "Permission Code",
+        "authLabelPlaceholder": "e.g. add, edit, delete",
+        "authSort": "Permission Sort",
+        "submitSuccess": "{action} successfully",
+        "validateFailed": "Form validation failed. Please check your input."
+      }
+    }
+  },
+  "userCenter": {
+    "profile": "User Profile",
+    "tagline": "Focused on local-first communication memory management",
+    "role": "Commory Administrator",
+    "location": "Local deployment",
+    "team": "Commory Workspace",
+    "tags": "Tags",
+    "tagList": ["Local-first", "Archive", "Privacy", "MsgLayer", "Searchable", "Exportable"],
+    "basicSettings": "Basic Settings",
+    "changePassword": "Change Password",
+    "realName": "Name",
+    "gender": "Gender",
+    "nickname": "Nickname",
+    "email": "Email",
+    "mobile": "Phone",
+    "address": "Address",
+    "bio": "Bio",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "male": "Male",
+    "female": "Female",
+    "edit": "Edit",
+    "save": "Save",
+    "validation": {
+      "realName": "Please enter name",
+      "nickname": "Please enter nickname",
+      "length": "Length must be 2 to 50 characters",
+      "email": "Please enter email",
+      "mobile": "Please enter phone number",
+      "address": "Please enter address",
+      "gender": "Please select gender"
+    },
+    "greetings": {
+      "early": "It is late. Get some rest.",
+      "morning": "Good morning",
+      "lateMorning": "Good morning",
+      "noon": "Good noon",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    }
+  },
+  "permission": {
+    "frontendMode": "Frontend permission mode",
+    "rolesHint": "Route roles control page access; user buttons control button visibility.",
+    "authHint": "v-auth is only for backend menu authList. In current frontend mode, prefer hasAuth."
   }
 }

@@ -1,88 +1,114 @@
 <template>
-  <div class="commory-dashboard">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Commory</p>
-        <h2>MsgLayer archive overview</h2>
-        <p class="subtext"
-          >Imports, events, identities, and the latest activity for the signed-in archive.</p
-        >
+  <div class="commory-page">
+    <ElCard class="overview-card" shadow="never">
+      <div class="overview-header">
+        <div>
+          <p class="eyebrow">Commory</p>
+          <h2>{{ t('dashboardPage.console.title') }}</h2>
+          <p>{{ t('dashboardPage.console.subtitle') }}</p>
+        </div>
+        <ElButton type="primary" @click="router.push('/dashboard/imports')" v-ripple>
+          {{ t('dashboardPage.console.openImports') }}
+        </ElButton>
       </div>
-      <ElButton type="primary" @click="router.push('/dashboard/imports')">Open Imports</ElButton>
-    </section>
+    </ElCard>
 
     <section class="stats-grid">
-      <article v-for="card in cards" :key="card.label" class="stat-panel">
-        <span class="label">{{ card.label }}</span>
+      <ElCard v-for="card in cards" :key="card.label" class="stat-card" shadow="never">
+        <span>{{ card.label }}</span>
         <strong>{{ card.value }}</strong>
-        <span class="hint">{{ card.hint }}</span>
-      </article>
+        <p>{{ card.hint }}</p>
+      </ElCard>
     </section>
 
     <section class="content-grid">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Recent imports</h3>
-          <span>{{ summary?.recentImports.length || 0 }} items</span>
-        </div>
-        <ElTable :data="summary?.recentImports || []" size="large">
-          <ElTableColumn prop="id" label="Import" min-width="180" />
-          <ElTableColumn prop="schema_version" label="Version" width="140" />
-          <ElTableColumn prop="event_count" label="Events" width="100" />
-          <ElTableColumn prop="imported_at" label="Imported At" min-width="180" />
+      <ElCard class="art-table-card" shadow="never">
+        <template #header>
+          <div class="panel-header">
+            <h3>{{ t('dashboardPage.console.recentImports') }}</h3>
+            <span>{{
+              t('dashboardPage.console.itemCount', { count: summary?.recentImports.length || 0 })
+            }}</span>
+          </div>
+        </template>
+        <ElTable :data="summary?.recentImports || []" size="large" v-loading="loading">
+          <ElTableColumn prop="id" :label="t('dashboardPage.columns.import')" min-width="180" />
+          <ElTableColumn
+            prop="schema_version"
+            :label="t('dashboardPage.columns.version')"
+            width="140"
+          />
+          <ElTableColumn
+            prop="event_count"
+            :label="t('dashboardPage.columns.events')"
+            width="100"
+          />
+          <ElTableColumn
+            prop="imported_at"
+            :label="t('dashboardPage.columns.importedAt')"
+            min-width="180"
+          />
         </ElTable>
-      </div>
+      </ElCard>
 
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Recent events</h3>
-          <ElButton link type="primary" @click="router.push('/dashboard/timeline')"
-            >View Timeline</ElButton
-          >
-        </div>
-        <div class="event-list">
+      <ElCard class="events-card" shadow="never">
+        <template #header>
+          <div class="panel-header">
+            <h3>{{ t('dashboardPage.console.recentEvents') }}</h3>
+            <ElButton link type="primary" @click="router.push('/dashboard/timeline')">
+              {{ t('dashboardPage.console.viewTimeline') }}
+            </ElButton>
+          </div>
+        </template>
+        <ElEmpty
+          v-if="!loading && !(summary?.recentEvents || []).length"
+          :description="t('dashboardPage.console.emptyEvents')"
+        />
+        <div v-else class="event-list" v-loading="loading">
           <div v-for="event in summary?.recentEvents || []" :key="event.event_id" class="event-row">
             <div>
               <p class="event-title">{{ event.content_summary || event.type }}</p>
-              <p class="event-meta">{{ event.type }} · {{ event.direction }}</p>
+              <p class="muted">{{ event.type }} · {{ event.direction }}</p>
             </div>
-            <span class="event-time">{{ event.timestamp }}</span>
+            <span class="muted">{{ event.timestamp }}</span>
           </div>
         </div>
-      </div>
+      </ElCard>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
   import { fetchDashboardSummary } from '@/api/commory'
+  import { useI18n } from 'vue-i18n'
 
   defineOptions({ name: 'Console' })
 
+  const { t } = useI18n()
   const router = useRouter()
   const summary = ref<Api.Commory.DashboardSummary>()
   const loading = ref(false)
 
   const cards = computed(() => [
     {
-      label: 'Imports',
+      label: t('dashboardPage.console.cards.imports'),
       value: summary.value?.importCount ?? 0,
-      hint: 'Validated MsgLayer payloads'
+      hint: t('dashboardPage.console.hints.imports')
     },
     {
-      label: 'Events',
+      label: t('dashboardPage.console.cards.events'),
       value: summary.value?.eventCount ?? 0,
-      hint: 'Timeline records indexed'
+      hint: t('dashboardPage.console.hints.events')
     },
     {
-      label: 'Identities',
+      label: t('dashboardPage.console.cards.identities'),
       value: summary.value?.identityCount ?? 0,
-      hint: 'Contacts and devices discovered'
+      hint: t('dashboardPage.console.hints.identities')
     },
     {
-      label: 'Last activity',
-      value: summary.value?.lastActivity || 'No imports yet',
-      hint: 'Most recent event timestamp'
+      label: t('dashboardPage.console.cards.lastActivity'),
+      value: summary.value?.lastActivity || t('dashboardPage.console.noImports'),
+      hint: t('dashboardPage.console.hints.lastActivity')
     }
   ])
 
@@ -100,47 +126,53 @@
 </script>
 
 <style scoped lang="scss">
-  .commory-dashboard {
+  .commory-page {
     display: grid;
-    gap: 20px;
+    gap: 16px;
   }
 
-  .hero,
-  .panel,
-  .stat-panel {
-    background: var(--art-main-bg-color);
+  .overview-card,
+  .stat-card,
+  .events-card {
     border: 1px solid var(--art-border-color);
     border-radius: 8px;
   }
 
-  .hero {
+  .overview-header {
     display: flex;
+    gap: 16px;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
-    padding: 24px;
+
+    h2,
+    p {
+      margin: 0;
+    }
 
     h2 {
-      margin: 6px 0 10px;
-      font-size: 28px;
-      line-height: 1.2;
+      margin-top: 5px;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--art-gray-800);
+    }
+
+    p:not(.eyebrow) {
+      margin-top: 8px;
+      color: var(--art-gray-600);
     }
   }
 
-  .eyebrow,
-  .subtext,
-  .label,
-  .hint,
-  .event-meta,
-  .event-time,
-  .panel-header span {
-    color: var(--art-gray-600);
+  .eyebrow {
+    margin: 0;
+    color: var(--main-color);
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .stats-grid,
   .content-grid {
     display: grid;
-    gap: 20px;
+    gap: 16px;
   }
 
   .stats-grid {
@@ -148,59 +180,79 @@
   }
 
   .content-grid {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
   }
 
-  .stat-panel,
-  .panel {
-    padding: 20px;
-  }
-
-  .stat-panel {
+  .stat-card :deep(.el-card__body) {
     display: grid;
     gap: 10px;
+    min-height: 132px;
+  }
+
+  .stat-card {
+    span,
+    p {
+      margin: 0;
+      color: var(--art-gray-600);
+    }
 
     strong {
       font-size: 28px;
       line-height: 1.1;
+      color: var(--art-gray-900);
     }
   }
 
   .panel-header,
   .event-row {
     display: flex;
+    gap: 12px;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+  }
+
+  .panel-header {
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    span {
+      color: var(--art-gray-600);
+    }
   }
 
   .event-list {
     display: grid;
     gap: 14px;
-    margin-top: 16px;
   }
 
   .event-row {
     padding-bottom: 14px;
     border-bottom: 1px solid var(--art-border-color);
-  }
 
-  .event-row:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
+    &:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
   }
 
   .event-title {
     margin: 0 0 4px;
   }
 
-  @media (max-width: 1080px) {
+  .muted {
+    color: var(--art-gray-600);
+  }
+
+  @media (max-width: 1100px) {
     .stats-grid,
     .content-grid {
       grid-template-columns: 1fr;
     }
 
-    .hero {
+    .overview-header {
       flex-direction: column;
       align-items: stretch;
     }

@@ -7,42 +7,66 @@
         :on-change="handleFileChange"
         accept=".json"
       >
-        <ElButton>Choose MsgLayer File</ElButton>
+        <ElButton>{{ t('dashboardPage.imports.chooseFile') }}</ElButton>
       </ElUpload>
-      <span class="file-name">{{ selectedFile?.name || 'No file selected' }}</span>
-      <ElButton :disabled="!selectedFile" @click="runValidate">Validate</ElButton>
-      <ElButton type="primary" :disabled="!selectedFile" @click="runImport">Import</ElButton>
+      <span class="file-name">{{ selectedFile?.name || t('dashboardPage.imports.noFile') }}</span>
+      <ElButton :disabled="!selectedFile" @click="runValidate">{{
+        t('dashboardPage.imports.validate')
+      }}</ElButton>
+      <ElButton type="primary" :disabled="!selectedFile" @click="runImport">{{
+        t('dashboardPage.imports.import')
+      }}</ElButton>
     </section>
 
-    <section class="panel">
+    <ElCard class="panel art-table-card" shadow="never">
       <div class="panel-header">
-        <h3>Import history</h3>
-        <span>{{ items.length }} imports</span>
+        <h3>{{ t('dashboardPage.imports.history') }}</h3>
+        <span>{{ t('dashboardPage.imports.count', { count: items.length }) }}</span>
       </div>
       <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
       <ElTable :data="items" size="large" v-loading="loading">
-        <ElTableColumn prop="id" label="Import" min-width="190" />
-        <ElTableColumn prop="schema_version" label="Version" width="140" />
-        <ElTableColumn prop="event_count" label="Events" width="100" />
-        <ElTableColumn prop="identity_count" label="Identities" width="110" />
-        <ElTableColumn prop="imported_at" label="Imported At" min-width="180" />
-        <ElTableColumn prop="source_path" label="Source" min-width="220" />
-        <ElTableColumn label="Action" width="120">
+        <ElTableColumn prop="id" :label="t('dashboardPage.columns.import')" min-width="190" />
+        <ElTableColumn
+          prop="schema_version"
+          :label="t('dashboardPage.columns.version')"
+          width="140"
+        />
+        <ElTableColumn prop="event_count" :label="t('dashboardPage.columns.events')" width="100" />
+        <ElTableColumn
+          prop="identity_count"
+          :label="t('dashboardPage.columns.identities')"
+          width="110"
+        />
+        <ElTableColumn
+          prop="imported_at"
+          :label="t('dashboardPage.columns.importedAt')"
+          min-width="180"
+        />
+        <ElTableColumn
+          prop="source_path"
+          :label="t('dashboardPage.columns.source')"
+          min-width="220"
+        />
+        <ElTableColumn :label="t('dashboardPage.columns.action')" width="120">
           <template #default="{ row }">
-            <ElButton link type="primary" @click="download(row.id)">Export</ElButton>
+            <ElButton link type="primary" @click="download(row.id)">{{
+              t('dashboardPage.imports.export')
+            }}</ElButton>
           </template>
         </ElTableColumn>
       </ElTable>
-    </section>
+    </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
   import type { UploadFile } from 'element-plus'
   import { downloadImport, fetchImports, uploadImport, validateImport } from '@/api/commory'
+  import { useI18n } from 'vue-i18n'
 
   defineOptions({ name: 'Imports' })
 
+  const { t } = useI18n()
   const loading = ref(false)
   const items = ref<Api.Commory.ImportSummary[]>([])
   const selectedFile = ref<File | null>(null)
@@ -65,13 +89,18 @@
   const runValidate = async () => {
     if (!selectedFile.value) return
     const result = await validateImport(selectedFile.value)
-    statusMessage.value = result.valid ? 'Validation passed.' : 'Validation failed.'
+    statusMessage.value = result.valid
+      ? t('dashboardPage.imports.validationPassed')
+      : t('dashboardPage.imports.validationFailed')
   }
 
   const runImport = async () => {
     if (!selectedFile.value) return
     const result = await uploadImport(selectedFile.value)
-    statusMessage.value = `Imported ${result.import_id} (${result.msglayer_version}).`
+    statusMessage.value = t('dashboardPage.imports.imported', {
+      id: result.import_id,
+      version: result.msglayer_version
+    })
     await load()
   }
 
@@ -101,10 +130,6 @@
     gap: 12px;
     align-items: center;
     padding: 16px;
-  }
-
-  .panel {
-    padding: 18px;
   }
 
   .panel-header {

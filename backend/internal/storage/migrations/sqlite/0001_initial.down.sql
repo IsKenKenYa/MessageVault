@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS schema_migrations;
+DROP TABLE IF EXISTS setup;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS relations;
+DROP TABLE IF EXISTS event_participants;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS identities;
+DROP TABLE IF EXISTS imports;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS users;

@@ -1,48 +1,80 @@
 <template>
-  <div class="setup-container">
-    <div class="setup-card">
-      <div class="setup-header">
-        <h2>Commory 系统初始化</h2>
-        <p>欢迎使用，请完成以下设置以开始使用系统</p>
-      </div>
+  <div class="setup-page">
+    <section class="setup-brand">
+      <p class="setup-eyebrow">{{ t('setup.eyebrow') }}</p>
+      <h1>{{ t('setup.title') }}</h1>
+      <p>{{ t('setup.subtitle') }}</p>
 
-      <div class="setup-steps">
-        <div
-          v-for="(step, index) in steps"
-          :key="index"
-          class="step-item"
-          :class="{ active: currentStep === index, done: currentStep > index }"
-        >
-          <div class="step-number">{{ currentStep > index ? '✓' : index + 1 }}</div>
-          <span class="step-label">{{ step }}</span>
+      <div class="brand-status">
+        <div class="brand-status__icon">
+          <ElIcon><CircleCheckFilled /></ElIcon>
+        </div>
+        <div>
+          <strong>{{ t('setup.database.ready') }}</strong>
+          <span>{{ t('setup.database.hint') }}</span>
         </div>
       </div>
+    </section>
+
+    <ElCard class="setup-card" shadow="never" v-loading="loadingStatus">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <h2>{{ t('setup.panelTitle') }}</h2>
+            <p>{{ t('setup.panelSubtitle') }}</p>
+          </div>
+          <ElTag type="success" effect="light">Commory</ElTag>
+        </div>
+      </template>
+
+      <ElAlert
+        v-if="statusWarning"
+        class="setup-alert"
+        :title="t('setup.apiUnavailable')"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+
+      <ElSteps :active="currentStep" finish-status="success" align-center>
+        <ElStep v-for="step in steps" :key="step" :title="step" />
+      </ElSteps>
 
       <div class="setup-content">
-        <div v-if="currentStep === 0">
-          <h3>数据库检查</h3>
-          <p class="step-desc">验证数据库连接状态</p>
-          <div class="db-status">
-            <ElIcon class="status-icon success"><CircleCheckFilled /></ElIcon>
+        <section v-show="currentStep === 0" class="step-panel">
+          <div class="step-heading">
+            <ElIcon><CircleCheckFilled /></ElIcon>
             <div>
-              <p class="db-type">SQLite 数据库</p>
-              <p class="db-hint">轻量级文件数据库，适合个人使用和小规模部署</p>
+              <h3>{{ t('setup.database.title') }}</h3>
+              <p>{{ t('setup.database.desc') }}</p>
             </div>
           </div>
-        </div>
 
-        <div v-if="currentStep === 1">
-          <h3>管理员账号</h3>
-          <p class="step-desc">设置管理员登录信息</p>
-          <div v-if="setupStatus?.root_init" class="admin-exists">
-            <ElAlert
-              title="管理员账号已存在"
-              description="系统中已有管理员用户，可直接进入下一步"
-              type="info"
-              :closable="false"
-              show-icon
-            />
+          <div class="info-row">
+            <span>{{ t('setup.finish.database') }}</span>
+            <strong>{{ setupStatus?.database_type || 'SQLite' }}</strong>
           </div>
+          <p class="muted">{{ t('setup.database.hint') }}</p>
+        </section>
+
+        <section v-show="currentStep === 1" class="step-panel">
+          <div class="step-heading">
+            <ElIcon><UserFilled /></ElIcon>
+            <div>
+              <h3>{{ t('setup.admin.title') }}</h3>
+              <p>{{ t('setup.admin.desc') }}</p>
+            </div>
+          </div>
+
+          <ElAlert
+            v-if="setupStatus?.root_init"
+            :title="t('setup.admin.existsTitle')"
+            :description="t('setup.admin.existsDesc')"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+
           <ElForm
             v-else
             ref="adminFormRef"
@@ -50,103 +82,116 @@
             :rules="adminRules"
             label-position="top"
           >
-            <ElFormItem label="用户名" prop="userName">
-              <ElInput v-model="adminForm.userName" placeholder="请输入管理员用户名" />
+            <ElFormItem :label="t('setup.admin.userName')" prop="userName">
+              <ElInput
+                v-model="adminForm.userName"
+                :placeholder="t('setup.admin.userNamePlaceholder')"
+              />
             </ElFormItem>
-            <ElFormItem label="密码" prop="password">
+            <ElFormItem :label="t('setup.admin.password')" prop="password">
               <ElInput
                 v-model="adminForm.password"
                 type="password"
-                placeholder="至少 8 个字符"
+                :placeholder="t('setup.admin.passwordPlaceholder')"
                 show-password
               />
             </ElFormItem>
-            <ElFormItem label="确认密码" prop="confirmPassword">
+            <ElFormItem :label="t('setup.admin.confirmPassword')" prop="confirmPassword">
               <ElInput
                 v-model="adminForm.confirmPassword"
                 type="password"
-                placeholder="再次输入密码"
+                :placeholder="t('setup.admin.confirmPasswordPlaceholder')"
                 show-password
               />
             </ElFormItem>
           </ElForm>
-        </div>
+        </section>
 
-        <div v-if="currentStep === 2">
-          <h3>使用模式</h3>
-          <p class="step-desc">选择系统运行模式</p>
-          <ElRadioGroup v-model="usageMode" class="mode-group">
-            <div
-              class="mode-option"
-              :class="{ selected: usageMode === 'personal' }"
-              @click="usageMode = 'personal'"
-            >
-              <ElRadio value="personal">个人模式</ElRadio>
-              <p class="mode-desc">适合个人使用，简化界面和功能</p>
-            </div>
-            <div
-              class="mode-option"
-              :class="{ selected: usageMode === 'family' }"
-              @click="usageMode = 'family'"
-            >
-              <ElRadio value="family">家庭模式</ElRadio>
-              <p class="mode-desc">适合家庭成员共享，支持多用户管理</p>
-            </div>
-          </ElRadioGroup>
-        </div>
-
-        <div v-if="currentStep === 3">
-          <h3>完成初始化</h3>
-          <p class="step-desc">确认设置并完成初始化</p>
-          <div class="summary">
-            <div class="summary-item">
-              <span class="summary-label">数据库</span>
-              <span class="summary-value">SQLite</span>
-            </div>
-            <div class="summary-item">
-              <span class="summary-label">管理员</span>
-              <span class="summary-value">{{
-                setupStatus?.root_init ? '已存在' : adminForm.userName || '未设置'
-              }}</span>
-            </div>
-            <div class="summary-item">
-              <span class="summary-label">使用模式</span>
-              <span class="summary-value">{{
-                usageMode === 'personal' ? '个人模式' : '家庭模式'
-              }}</span>
+        <section v-show="currentStep === 2" class="step-panel">
+          <div class="step-heading">
+            <ElIcon><Operation /></ElIcon>
+            <div>
+              <h3>{{ t('setup.mode.title') }}</h3>
+              <p>{{ t('setup.mode.desc') }}</p>
             </div>
           </div>
-        </div>
+
+          <ElRadioGroup v-model="usageMode" class="mode-grid">
+            <label class="mode-option" :class="{ selected: usageMode === 'personal' }">
+              <ElRadio value="personal">{{ t('setup.mode.personal') }}</ElRadio>
+              <span>{{ t('setup.mode.personalDesc') }}</span>
+            </label>
+            <label class="mode-option" :class="{ selected: usageMode === 'family' }">
+              <ElRadio value="family">{{ t('setup.mode.family') }}</ElRadio>
+              <span>{{ t('setup.mode.familyDesc') }}</span>
+            </label>
+          </ElRadioGroup>
+        </section>
+
+        <section v-show="currentStep === 3" class="step-panel">
+          <div class="step-heading">
+            <ElIcon><Select /></ElIcon>
+            <div>
+              <h3>{{ t('setup.finish.title') }}</h3>
+              <p>{{ t('setup.finish.desc') }}</p>
+            </div>
+          </div>
+
+          <div class="summary-list">
+            <div class="info-row">
+              <span>{{ t('setup.finish.database') }}</span>
+              <strong>{{ setupStatus?.database_type || 'SQLite' }}</strong>
+            </div>
+            <div class="info-row">
+              <span>{{ t('setup.finish.admin') }}</span>
+              <strong>{{ adminSummary }}</strong>
+            </div>
+            <div class="info-row">
+              <span>{{ t('setup.finish.usageMode') }}</span>
+              <strong>{{ usageModeLabel }}</strong>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div class="setup-actions">
-        <ElButton v-if="currentStep > 0" @click="currentStep--">上一步</ElButton>
-        <ElButton v-if="currentStep < 3" type="primary" @click="nextStep">下一步</ElButton>
-        <ElButton
-          v-if="currentStep === 3"
-          type="primary"
-          :loading="submitting"
-          @click="handleInitialize"
-          >完成初始化</ElButton
-        >
+        <ElButton v-if="currentStep > 0" @click="currentStep--">
+          {{ t('setup.actions.prev') }}
+        </ElButton>
+        <ElButton v-if="currentStep < lastStep" type="primary" @click="nextStep">
+          {{ t('setup.actions.next') }}
+        </ElButton>
+        <ElButton v-else type="primary" :loading="submitting" @click="handleInitialize">
+          {{ t('setup.actions.finish') }}
+        </ElButton>
       </div>
-    </div>
+    </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { CircleCheckFilled } from '@element-plus/icons-vue'
+  import { CircleCheckFilled, Operation, Select, UserFilled } from '@element-plus/icons-vue'
   import { fetchSetupStatus, postSetup } from '@/api/setup'
   import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
 
   defineOptions({ name: 'SetupWizard' })
 
+  const { t } = useI18n()
   const router = useRouter()
   const currentStep = ref(0)
+  const loadingStatus = ref(true)
   const submitting = ref(false)
+  const statusWarning = ref(false)
   const setupStatus = ref<Api.Setup.SetupStatus>()
+  const lastStep = 3
 
-  const steps = ['数据库检查', '管理员账号', '使用模式', '完成初始化']
+  const steps = computed(() => [
+    t('setup.steps.database'),
+    t('setup.steps.admin'),
+    t('setup.steps.mode'),
+    t('setup.steps.finish')
+  ])
 
   const adminFormRef = ref<FormInstance>()
   const adminForm = reactive({
@@ -156,36 +201,49 @@
   })
 
   const adminRules = computed<FormRules>(() => ({
-    userName: [{ required: true, message: '请输入管理员用户名', trigger: 'blur' }],
+    userName: [
+      { required: true, message: t('setup.validation.userNameRequired'), trigger: 'blur' }
+    ],
     password: [
-      { required: true, message: '请输入密码', trigger: 'blur' },
-      { min: 8, message: '密码至少 8 个字符', trigger: 'blur' }
+      { required: true, message: t('setup.validation.passwordRequired'), trigger: 'blur' },
+      { min: 8, message: t('setup.validation.passwordLength'), trigger: 'blur' }
     ],
     confirmPassword: [
-      { required: true, message: '请确认密码', trigger: 'blur' },
+      { required: true, message: t('setup.validation.confirmPasswordRequired'), trigger: 'blur' },
       {
-        validator: (_rule: any, value: string, callback: (err?: Error) => void) => {
+        validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
           if (value !== adminForm.password) {
-            callback(new Error('两次输入的密码不一致'))
-          } else {
-            callback()
+            callback(new Error(t('setup.validation.passwordMismatch')))
+            return
           }
+          callback()
         },
         trigger: 'blur'
       }
     ]
   }))
 
-  const usageMode = ref('personal')
+  const usageMode = ref<'personal' | 'family'>('personal')
+  const usageModeLabel = computed(() =>
+    usageMode.value === 'personal' ? t('setup.mode.personal') : t('setup.mode.family')
+  )
+  const adminSummary = computed(() => {
+    if (setupStatus.value?.root_init) return t('setup.admin.existing')
+    return adminForm.userName || t('setup.admin.notSet')
+  })
 
   const loadStatus = async () => {
+    loadingStatus.value = true
+    statusWarning.value = false
     try {
       setupStatus.value = await fetchSetupStatus()
       if (setupStatus.value?.status) {
         router.replace('/')
       }
     } catch {
-      // API not available, allow setup to proceed
+      statusWarning.value = true
+    } finally {
+      loadingStatus.value = false
     }
   }
 
@@ -195,7 +253,7 @@
       const valid = await adminFormRef.value.validate().catch(() => false)
       if (!valid) return
     }
-    currentStep.value++
+    currentStep.value = Math.min(currentStep.value + 1, lastStep)
   }
 
   const handleInitialize = async () => {
@@ -207,8 +265,8 @@
         confirmPassword: adminForm.confirmPassword,
         usageMode: usageMode.value
       })
-      ElMessage.success('系统初始化成功')
-      setTimeout(() => {
+      ElMessage.success(t('setup.message.success'))
+      window.setTimeout(() => {
         router.replace('/auth/login')
       }, 1200)
     } catch {
@@ -222,185 +280,245 @@
 </script>
 
 <style scoped lang="scss">
-  .setup-container {
-    display: flex;
+  .setup-page {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 560px);
+    gap: 28px;
     align-items: center;
-    justify-content: center;
     min-height: 100vh;
-    background: var(--art-main-bg-color);
-    padding: 20px;
-  }
-
-  .setup-card {
-    width: 100%;
-    max-width: 600px;
-    background: var(--default-box-color);
-    border: 1px solid var(--art-border-color);
-    border-radius: 12px;
     padding: 40px;
+    background: var(--art-main-bg-color);
   }
 
-  .setup-header {
-    text-align: center;
-    margin-bottom: 32px;
+  .setup-brand {
+    display: grid;
+    gap: 18px;
+    max-width: 560px;
 
-    h2 {
-      margin: 0 0 8px;
-      font-size: 24px;
+    h1 {
+      margin: 0;
+      font-size: 38px;
+      line-height: 1.16;
+      color: var(--art-gray-800);
     }
 
     p {
+      max-width: 460px;
+      margin: 0;
       color: var(--art-gray-600);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+  }
+
+  .setup-eyebrow {
+    color: var(--main-color) !important;
+    font-size: 13px !important;
+    font-weight: 600;
+  }
+
+  .brand-status {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    width: min(100%, 420px);
+    padding: 16px;
+    margin-top: 12px;
+    background: var(--default-box-color);
+    border: 1px solid var(--art-border-color);
+    border-radius: 8px;
+
+    strong,
+    span {
+      display: block;
+    }
+
+    span {
+      margin-top: 3px;
+      color: var(--art-gray-600);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  }
+
+  .brand-status__icon,
+  .step-heading .el-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    color: var(--main-color);
+    background: color-mix(in srgb, var(--main-color) 10%, transparent);
+    border-radius: 8px;
+  }
+
+  .setup-card {
+    border: 1px solid var(--art-border-color);
+    border-radius: 8px;
+
+    :deep(.el-card__body) {
+      padding: 24px;
+    }
+  }
+
+  .card-header {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    h2,
+    p {
       margin: 0;
     }
-  }
 
-  .setup-steps {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 32px;
-    padding: 0 20px;
-  }
-
-  .step-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    opacity: 0.5;
-
-    &.active,
-    &.done {
-      opacity: 1;
-    }
-
-    .step-number {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
+    h2 {
+      font-size: 20px;
       font-weight: 600;
-      background: var(--art-gray-200);
+    }
+
+    p {
+      margin-top: 6px;
       color: var(--art-gray-600);
+      font-size: 13px;
     }
+  }
 
-    &.active .step-number {
-      background: var(--main-color);
-      color: #fff;
-    }
-
-    &.done .step-number {
-      background: #67c23a;
-      color: #fff;
-    }
-
-    .step-label {
-      font-size: 12px;
-      color: var(--art-gray-600);
-    }
+  .setup-alert {
+    margin-bottom: 18px;
   }
 
   .setup-content {
-    min-height: 200px;
-    margin-bottom: 24px;
-
-    h3 {
-      margin: 0 0 8px;
-      font-size: 18px;
-    }
-
-    .step-desc {
-      color: var(--art-gray-600);
-      margin: 0 0 20px;
-    }
+    min-height: 310px;
+    padding: 26px 0 8px;
   }
 
-  .db-status {
+  .step-panel {
+    display: grid;
+    gap: 18px;
+  }
+
+  .step-heading {
     display: flex;
-    align-items: flex-start;
     gap: 12px;
-    padding: 16px;
-    background: var(--art-gray-100);
-    border-radius: 8px;
+    align-items: flex-start;
 
-    .status-icon {
-      font-size: 24px;
-
-      &.success {
-        color: #67c23a;
-      }
-    }
-
-    .db-type {
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-
-    .db-hint {
-      color: var(--art-gray-600);
-      font-size: 13px;
+    h3,
+    p {
       margin: 0;
     }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    p {
+      margin-top: 5px;
+      color: var(--art-gray-600);
+      font-size: 13px;
+    }
   }
 
-  .admin-exists {
-    margin-top: 12px;
-  }
-
-  .mode-group {
+  .info-row {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--art-main-bg-color);
+    border: 1px solid var(--art-border-color);
+    border-radius: 8px;
+
+    span {
+      color: var(--art-gray-600);
+    }
+  }
+
+  .muted {
+    margin: 0;
+    color: var(--art-gray-600);
+    font-size: 13px;
+  }
+
+  .mode-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
     width: 100%;
   }
 
   .mode-option {
+    display: grid;
+    gap: 8px;
+    min-height: 118px;
     padding: 16px;
-    border: 2px solid var(--art-border-color);
-    border-radius: 8px;
     cursor: pointer;
-    transition: border-color 0.2s;
+    border: 1px solid var(--art-border-color);
+    border-radius: 8px;
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease;
 
     &.selected {
+      background: color-mix(in srgb, var(--main-color) 8%, transparent);
       border-color: var(--main-color);
     }
 
-    .mode-desc {
+    span {
       color: var(--art-gray-600);
       font-size: 13px;
-      margin: 4px 0 0;
+      line-height: 1.6;
     }
   }
 
-  .summary {
+  .summary-list {
     display: grid;
     gap: 12px;
   }
 
-  .summary-item {
+  .setup-actions {
     display: flex;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: var(--art-gray-100);
-    border-radius: 6px;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 18px;
+    border-top: 1px solid var(--art-border-color);
+  }
 
-    .summary-label {
-      color: var(--art-gray-600);
+  @media (max-width: 980px) {
+    .setup-page {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+      padding: 24px;
     }
 
-    .summary-value {
-      font-weight: 600;
+    .setup-brand {
+      max-width: none;
+
+      h1 {
+        font-size: 30px;
+      }
     }
   }
 
-  .setup-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding-top: 16px;
-    border-top: 1px solid var(--art-border-color);
+  @media (max-width: 640px) {
+    .setup-page {
+      padding: 14px;
+    }
+
+    .mode-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .setup-actions {
+      flex-direction: column-reverse;
+
+      .el-button {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
   }
 </style>

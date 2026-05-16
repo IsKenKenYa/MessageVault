@@ -224,10 +224,10 @@
       if (user) {
         userStore.setUserInfo(user)
       }
-      ElMessage.success('注册成功')
+      ElMessage.success(t('register.success.message'))
       router.push('/')
     } catch (error) {
-      console.error('表单验证失败:', error)
+      console.error('[Register] form validation failed:', error)
       loading.value = false
     }
   }

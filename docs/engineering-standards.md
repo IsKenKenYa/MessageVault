@@ -54,6 +54,7 @@
 - Web UI 以 `references/art-design-pro` 为模板基线，`references/memos/web` 仅作产品组织参考。
 - 新页面必须遵循 `docs/web-dashboard-guidelines.md`，满足中英 i18n、dark mode、主题变量、ECharts 配色、布局密度和 Element Plus 规范。
 - `web/.env.production` 默认使用同源 API，不得恢复到 mock 服务作为生产默认值。
+- Web 默认权限模式为 frontend：`roles` 用于路由访问，`buttons` 用于按钮能力。backend 动态菜单属于未来商业化或多租户场景，不作为当前默认架构。
 
 ## Docker 与部署
 

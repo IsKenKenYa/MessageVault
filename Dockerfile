@@ -9,11 +9,12 @@ COPY web/ ./
 RUN pnpm exec vite build && pnpm exec vue-tsc --noEmit
 
 FROM golang:1.25-alpine AS backend-builder
+RUN apk add --no-cache gcc musl-dev
 WORKDIR /src/backend
-COPY backend/go.mod ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
-RUN go build -ldflags="-s -w" -o /out/commory ./cmd/commory
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /out/commory ./cmd/commory
 
 FROM alpine:3.22
 RUN addgroup -S commory && adduser -S commory -G commory
@@ -25,7 +26,7 @@ RUN mkdir -p /data && chown -R commory:commory /data /app
 USER commory
 ENV COMMORY_LISTEN_ADDR=:3000 \
     COMMORY_DB_DRIVER=sqlite \
-    COMMORY_DB_DSN=/data/commory-store.json \
+    COMMORY_DB_DSN=/data/commory.db \
     COMMORY_SCHEMA_ROOT=/app/msglayer/schema/v0.1/root.schema.json \
     COMMORY_WEB_ROOT=/app/web \
     COMMORY_ENV=production
